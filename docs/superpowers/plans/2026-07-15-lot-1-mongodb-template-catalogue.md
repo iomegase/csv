@@ -868,8 +868,11 @@ export function inferColumnType(values: string[]): DetectedType {
   // Les booléens passent avant les nombres : sinon « 0 »/« 1 » seraient
   // ambigus. On ne les traite volontairement pas comme des booléens.
   if (every((value) => BOOLEAN_VALUES.has(value.toLocaleLowerCase('fr')))) return 'boolean'
-  if (every((value) => parseLocalizedNumber(value) !== null)) return 'number'
+  // Les dates passent AVANT les nombres : parseLocalizedNumber('15/07/2026')
+  // retire les barres obliques et rend 15072026, pas null. Tester le nombre en
+  // premier classerait donc toute colonne de dates françaises en « number ».
   if (every((value) => ISO_DATE.test(value) || FR_DATE.test(value))) return 'date'
+  if (every((value) => parseLocalizedNumber(value) !== null)) return 'number'
   if (every(isJsonValue)) return 'json'
 
   return 'string'
