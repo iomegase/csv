@@ -28,7 +28,20 @@ export function detectEncoding(buffer: Buffer): { encoding: string; confident: b
     return { encoding: 'utf-8', confident: false }
   }
 
-  return { encoding: detected.toLowerCase(), confident: true }
+  const encoding = detected.toLowerCase()
+
+  // chardet classe souvent un CSV d'accents français en ISO-8859-1, alors que
+  // ShopCaisse (une caisse enregistreuse) produit aussi des euros. Les deux
+  // encodages sont identiques sur les accents mais divergent sur 0x80-0x9F,
+  // où windows-1252 place l'euro (0x80) : en ISO-8859-1 ce même octet devient
+  // un caractère de contrôle invisible. windows-1252 est un sur-ensemble
+  // strict sur tout caractère imprimable, donc ce repli est sans contrepartie
+  // (c'est d'ailleurs le comportement imposé par la spec HTML5).
+  if (encoding === 'iso-8859-1') {
+    return { encoding: 'windows-1252', confident: true }
+  }
+
+  return { encoding, confident: true }
 }
 
 export function parseCsvBuffer(buffer: Buffer): ParsedCsv {

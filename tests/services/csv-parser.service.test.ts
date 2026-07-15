@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import iconv from 'iconv-lite'
-import { inferColumnType, parseCsvBuffer } from '@/services/csv-parser.service'
+import { detectEncoding, inferColumnType, parseCsvBuffer } from '@/services/csv-parser.service'
 
 describe('parseCsvBuffer', () => {
   it('analyse un CSV UTF-8 point-virgule', () => {
@@ -39,6 +39,29 @@ describe('parseCsvBuffer', () => {
   it('conserve les colonnes supplémentaires', () => {
     const buffer = Buffer.from('Nom;Colonne Maison\r\nVase;valeur\r\n', 'utf-8')
     expect(parseCsvBuffer(buffer).rows[0]['Colonne Maison']).toBe('valeur')
+  })
+
+  it('conserve l’euro d’un fichier windows-1252', () => {
+    // Sur ce petit échantillon chardet reconnaît déjà windows-1252, mais
+    // c'est le bug qu'on prévient : si l'euro (0x80) était décodé comme en
+    // ISO-8859-1, il deviendrait un caractère de contrôle invisible.
+    const buffer = iconv.encode('Nom;Prix\r\nVase;12,50 €\r\n', 'windows-1252')
+    const parsed = parseCsvBuffer(buffer)
+
+    expect(parsed.rows[0].Prix).toBe('12,50 €')
+  })
+})
+
+describe('detectEncoding', () => {
+  it('ne rend jamais iso-8859-1 : un fichier d’accents seuls bascule sur windows-1252', () => {
+    // chardet classe ce buffer en ISO-8859-1 (vérifié empiriquement), un cas
+    // plausible pour un gros export ShopCaisse avec peu ou pas d'euros.
+    const buffer = iconv.encode(
+      'Nom;Famille\r\nVase Décoratif;Objets déco\r\nCoussin brodé;Décoration\r\n',
+      'windows-1252',
+    )
+
+    expect(detectEncoding(buffer).encoding).toBe('windows-1252')
   })
 })
 
