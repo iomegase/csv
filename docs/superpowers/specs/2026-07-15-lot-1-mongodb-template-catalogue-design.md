@@ -113,26 +113,50 @@ ultérieur.
 
 
 
-### D6 — Réactivation d'un ancien template sans resynchronisation
+### D6 — Réactivation refusée par défaut si les colonnes divergent
 
 `PATCH /api/csv-templates/[templateId]/activate` ne fait que déplacer le
 drapeau `isActive`. Elle **ne resynchronise pas** le catalogue : aucun fichier
 source n'est rejoué, aucune donnée produit n'est touchée.
 
-Conséquence à assumer, que la spec d'origine laissait dans l'ombre : les clés de
-`csvData` sont les noms de colonnes du CSV qui a alimenté le catalogue. Si le
-template réactivé a des colonnes différentes, l'export lira des clés absentes et
-produira des cellules vides — silencieusement.
+Le problème que la spec d'origine laissait dans l'ombre : les clés de `csvData`
+sont les noms de colonnes du CSV qui a alimenté le catalogue. Si le template
+réactivé a des colonnes différentes, l'export lira des clés absentes et
+produira un CSV troué, silencieusement.
 
-Résolution : l'export lit `csvData` par nom de colonne du template actif ; une
-colonne absente donne une cellule vide, cohérent avec le traitement de `null`.
-L'écran `/catalogue` **compare les colonnes du template actif à celles réellement
-présentes dans le catalogue** et affiche un avertissement nommant les colonnes
-manquantes. L'utilisateur voit donc le problème au lieu de télécharger un CSV
-troué.
+**Résolution — refus par défaut, forçage explicite.** Avant d'activer, la route
+compare les colonnes du template visé aux clés réellement présentes dans le
+catalogue. Si des colonnes manquent, elle répond **409** en les nommant, et
+n'active rien :
+
+```json
+{
+  "error": "template_columns_missing_from_catalog",
+  "missingColumns": ["Code barre", "Prix d'achat"],
+  "hint": "Réactivez malgré tout avec force: true, ou rejouez l'import d'origine via from-import."
+}
+```
+
+Un corps `{ "force": true }` passe outre et active quand même. L'export troué
+devient ainsi impossible par accident, tout en restant atteignable sciemment.
+
+La vérification porte sur les **clés effectivement présentes dans `csvData`**,
+échantillonnées sur le catalogue, et non sur les colonnes du template
+précédent : un produit peut avoir été créé par une facture (lot 3) sans porter
+toutes les colonnes.
+
+Le contrôle est **dans la transaction d'activation**, pour qu'une
+synchronisation concurrente ne puisse pas invalider le constat entre la
+vérification et l'écriture.
+
+En complément, et parce que le forçage reste possible : l'export lit `csvData`
+par nom de colonne du template actif, une colonne absente donnant une cellule
+vide — cohérent avec le traitement de `null`. `/catalogue` affiche en
+permanence un avertissement nommant les colonnes manquantes le cas échéant.
 
 Resynchroniser depuis un ancien import reste possible en repassant par
 `from-import`, qui rejoue le fichier d'origine.
+
 ### D7 — Quatrième collection `CsvImport`, fichier brut sur disque
 
 La spec nomme une route `from-import` mais ne définit aucune collection
@@ -315,7 +339,7 @@ et 3.
 | `POST /api/csv-imports` | Téléverser le CSV brut, créer le `CsvImport` |
 | `POST /api/csv-templates/from-import` | Créer et activer le template, synchroniser |
 | `GET /api/csv-templates/active` | Lire le template actif |
-| `PATCH /api/csv-templates/[templateId]/activate` | Réactiver un template existant |
+| `PATCH /api/csv-templates/[templateId]/activate` | Réactiver un template ; 409 si ses colonnes manquent au catalogue, sauf `force: true` (D6) |
 | `GET /api/catalog/products` | Lire le catalogue, paginé |
 | `GET /api/catalog/export` | Exporter le CSV du catalogue |
 
@@ -394,6 +418,9 @@ Couverture, avec la numérotation de la spec d'origine :
 12. un produit absent du CSV n'est ni supprimé ni marqué *(D2)*
 13. `null` produit une cellule vide à l'export
 14. les colonnes supplémentaires du CSV survivent au cycle import → export
+15. réactiver un template aux colonnes absentes du catalogue répond 409 et
+    n'active rien *(D6)*
+16. le même appel avec `force: true` active le template *(D6)*
 
 Les tests 5 à 13 et 15 à 21 de la spec d'origine portent sur les factures et
 relèvent des lots 2 et 3.
