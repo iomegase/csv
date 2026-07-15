@@ -382,7 +382,11 @@ const CsvTemplateSchema = new Schema(
     columns: { type: [CsvColumnSchema], required: true },
     delimiter: { type: String, default: ';' },
     encoding: { type: String, default: 'utf-8' },
-    isActive: { type: Boolean, default: false, index: true },
+    // Pas d'`index: true` ici : il créerait un index { isActive: 1 } simple, en
+    // conflit d'options avec l'index partiel unique ci-dessous sur la même clé
+    // (MongoDB refuse deux index identiques aux options divergentes). L'index
+    // partiel suffit : les requêtes portent sur { isActive: true }.
+    isActive: { type: Boolean, default: false },
   },
   { timestamps: true },
 )
