@@ -311,7 +311,6 @@ Résumé retourné :
 type CatalogSyncSummary = {
   created: number
   updated: number
-  unchanged: number
   ambiguous: Array<{ row: number; matchedBy: string; candidateIds: string[] }>
   missingFromCsv: string[]   // au catalogue, absents du CSV — non supprimés (D2)
   errors: Array<{ row: number; message: string }>
