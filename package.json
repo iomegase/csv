@@ -6,7 +6,10 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mongo:start": "./scripts/mongo-dev.sh start",
+    "mongo:stop": "./scripts/mongo-dev.sh stop",
+    "mongo:status": "./scripts/mongo-dev.sh status"
   },
   "dependencies": {
     "lucide-react": "latest",
