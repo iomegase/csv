@@ -83,7 +83,7 @@ export function normalizeHeader(value: string): string {
     .trim()
 }
 
-function findColumn(columns: string[], aliases: string[]): string {
+export function findColumn(columns: string[], aliases: string[]): string {
   const normalizedColumns = columns.map((column) => ({
     original: column,
     normalized: normalizeHeader(column),
