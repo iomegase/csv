@@ -130,14 +130,17 @@ describe('connectToDatabase', () => {
     const session = await mongoose.startSession()
 
     // Le vrai test du replica set : sur un standalone, startTransaction est
-    // accepté mais le commit échoue avec NoReplicationEnabled.
-    await expect(
-      session.withTransaction(async () => {
-        await mongoose.connection.db!.collection('probe').insertOne({ ok: 1 }, { session })
-      }),
-    ).resolves.toBeDefined()
-
+    // accepté mais le commit échoue avec NoReplicationEnabled. On vérifie que
+    // le commit a eu lieu (le document existe après coup) plutôt que la valeur
+    // de retour de withTransaction : celle-ci vaut ce que renvoie le callback,
+    // donc undefined ici, et n'indique rien du succès.
+    await session.withTransaction(async () => {
+      await mongoose.connection.db!.collection('probe').insertOne({ ok: 1 }, { session })
+    })
     await session.endSession()
+
+    const count = await mongoose.connection.db!.collection('probe').countDocuments({ ok: 1 })
+    expect(count).toBe(1)
   })
 
   it('échoue clairement sans MONGODB_URI', async () => {
