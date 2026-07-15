@@ -9,7 +9,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr">
-      <body>{children}</body>
+      {/* Les extensions de navigateur (ColorZilla, Grammarly…) ajoutent des
+          attributs au body avant l'hydratation, ce que le serveur ne peut pas
+          anticiper. La suppression ne porte que sur le body lui-même : les
+          écarts dans les enfants continuent d'être signalés. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }
