@@ -1049,7 +1049,9 @@ export function assertCsvFile(fileName: string, mimeType: string, size: number):
   }
 
   if (!/\.csv$/i.test(fileName)) {
-    throw new Error('Le fichier doit porter l’extension .csv.')
+    // Le message doit contenir « CSV » en majuscules : le test l'assert avec
+    // /CSV/, une regex sensible à la casse.
+    throw new Error('Le fichier doit être un CSV (extension .csv attendue).')
   }
 
   // Les navigateurs et tableurs annoncent le CSV sous des types très variables,
