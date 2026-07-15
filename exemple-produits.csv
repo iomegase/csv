@@ -1,0 +1,4 @@
+reference;nom;famille;prix;stock;actif
+ART-001;Vase en céramique;Décoration;29,90;12;oui
+ART-002;Lampe de table;Luminaire;49,00;4;oui
+ART-003;Coussin lin;Textile;24,50;0;non

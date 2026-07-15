@@ -1,0 +1,20 @@
+# dépendances
+/node_modules
+
+# build Next.js
+/.next
+/out
+next-env.d.ts
+*.tsbuildinfo
+
+# variables d'environnement (ne jamais versionner : contient l'URI MongoDB)
+.env
+.env.local
+.env*.local
+
+# fichiers téléversés (factures PDF, imports CSV)
+/uploads
+
+# système
+.DS_Store
+*.log
