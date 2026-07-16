@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, PackagePlus, Plus, RefreshCw, Trash2 } from 'lucide-react'
 
 type InvoiceItem = {
   supplierReference: string | null
@@ -19,6 +19,7 @@ interface Invoice {
   originalFileName: string
   errorMessage: string | null
   validatedAt: string | null
+  appliedToCatalogAt: string | null
   items: InvoiceItem[]
 }
 
@@ -117,6 +118,25 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
     await load()
   }
 
+  async function applyToCatalog() {
+    setError('')
+    setMessage('')
+    const response = await fetch(`/api/admin/invoices/${invoiceId}/apply-to-catalog`, {
+      method: 'POST',
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      setError(data.message ?? 'Application au catalogue impossible.')
+      return
+    }
+    const s = data.summary
+    const parts = [`${s.updated} mis à jour`, `${s.created} créés`]
+    if (s.ambiguous.length) parts.push(`${s.ambiguous.length} ambigus (non appliqués)`)
+    if (s.skipped.length) parts.push(`${s.skipped.length} ignorés (sans quantité)`)
+    setMessage(`Catalogue mis à jour : ${parts.join(', ')}.`)
+    await load()
+  }
+
   async function remove() {
     if (!window.confirm('Supprimer cette facture ? Cette action est définitive.')) return
     await fetch(`/api/admin/invoices/${invoiceId}`, { method: 'DELETE' })
@@ -138,6 +158,20 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
           <a href={`/api/admin/invoices/${invoiceId}/export`} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
             <Download className="h-4 w-4" /> Télécharger le CSV
           </a>
+          {invoice.validatedAt && !invoice.appliedToCatalogAt && (
+            <button
+              type="button"
+              onClick={applyToCatalog}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              <PackagePlus className="h-4 w-4" /> Appliquer au catalogue
+            </button>
+          )}
+          {invoice.appliedToCatalogAt && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+              <PackagePlus className="h-4 w-4" /> Appliquée au catalogue
+            </span>
+          )}
           <button type="button" onClick={remove} className="inline-flex items-center gap-2 rounded-full border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50">
             <Trash2 className="h-4 w-4" /> Supprimer
           </button>
