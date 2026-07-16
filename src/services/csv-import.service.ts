@@ -1,13 +1,9 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { basename, join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { basename } from 'node:path'
 import { connectToDatabase } from '@/lib/mongodb'
 import { CsvImport } from '@/models/CsvImport'
 import { parseCsvBuffer } from '@/services/csv-parser.service'
 
 export const MAX_CSV_BYTES = Number(process.env.MAX_CSV_BYTES ?? 10 * 1024 * 1024)
-
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'csv')
 
 export interface CsvImportResult {
   importId: string
@@ -47,8 +43,9 @@ export async function createCsvImport(input: {
   originalFileName: string
   mimeType: string
 }): Promise<CsvImportResult> {
-  // basename neutralise « ../ » : un nom de fichier vient du client et ne doit
-  // jamais pouvoir désigner un chemin hors du dossier d'upload.
+  // basename neutralise « ../ » : le nom vient du client et ne doit désigner
+  // qu'un fichier, jamais un chemin. Conservé même sans disque : c'est le nom
+  // réaffiché et réexporté.
   const safeName = basename(input.originalFileName)
 
   assertCsvFile(safeName, input.mimeType, input.buffer.byteLength)
@@ -56,38 +53,24 @@ export async function createCsvImport(input: {
   const parsed = parseCsvBuffer(input.buffer)
 
   await connectToDatabase()
-  await mkdir(UPLOAD_DIR, { recursive: true })
 
-  const storedFileName = `${randomUUID()}.csv`
-  const filePath = join(UPLOAD_DIR, storedFileName)
+  const doc = await CsvImport.create({
+    originalFileName: safeName,
+    rawContent: input.buffer,
+    fileSize: input.buffer.byteLength,
+    mimeType: input.mimeType,
+    encoding: parsed.encoding,
+    delimiter: parsed.delimiter,
+    columns: parsed.columns,
+    rowCount: parsed.rows.length,
+  })
 
-  await writeFile(filePath, input.buffer)
-
-  try {
-    const doc = await CsvImport.create({
-      originalFileName: safeName,
-      storedFileName,
-      filePath,
-      fileSize: input.buffer.byteLength,
-      mimeType: input.mimeType,
-      encoding: parsed.encoding,
-      delimiter: parsed.delimiter,
-      columns: parsed.columns,
-      rowCount: parsed.rows.length,
-    })
-
-    return {
-      importId: String(doc._id),
-      columns: parsed.columns,
-      rowCount: parsed.rows.length,
-      encoding: parsed.encoding,
-      encodingConfident: parsed.encodingConfident,
-      delimiter: parsed.delimiter,
-    }
-  } catch (error) {
-    // Sans ce nettoyage, un échec Mongo laisserait un fichier orphelin sur
-    // disque, sans document pour le retrouver.
-    await rm(filePath, { force: true })
-    throw error
+  return {
+    importId: String(doc._id),
+    columns: parsed.columns,
+    rowCount: parsed.rows.length,
+    encoding: parsed.encoding,
+    encodingConfident: parsed.encodingConfident,
+    delimiter: parsed.delimiter,
   }
 }

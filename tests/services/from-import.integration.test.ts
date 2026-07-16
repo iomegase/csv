@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { rm } from 'node:fs/promises'
 import { withTestDatabase } from '../helpers/db'
 import { createCsvImport } from '@/services/csv-import.service'
 import { createTemplateFromImport, activateTemplate } from '@/services/csv-template.service'
 import { syncCatalogFromCsv } from '@/services/catalog-sync.service'
 import { CsvTemplate } from '@/models/CsvTemplate'
 import { CatalogProduct } from '@/models/CatalogProduct'
-import { CsvImport } from '@/models/CsvImport'
 
 withTestDatabase()
 
@@ -43,9 +41,6 @@ describe('chaîne complète import → template → catalogue', () => {
     expect(summary.created).toBe(1)
     const product = await CatalogProduct.findOne({}).lean()
     expect(product!.csvData).toMatchObject({ Nom: 'Vase', Famille: 'Objets déco' })
-
-    const doc = await CsvImport.findById(imported.importId)
-    await rm(doc!.filePath, { force: true })
   })
 
   it('un seul template reste actif après plusieurs imports', async () => {
@@ -58,8 +53,6 @@ describe('chaîne complète import → template → catalogue', () => {
       const { templateId, parsed } = await createTemplateFromImport(imported.importId)
       await syncCatalogFromCsv(templateId, parsed)
       await activateTemplate(templateId, { force: true })
-      const doc = await CsvImport.findById(imported.importId)
-      await rm(doc!.filePath, { force: true })
     }
 
     expect(await CsvTemplate.countDocuments({ isActive: true })).toBe(1)

@@ -1,5 +1,4 @@
 import mongoose, { isValidObjectId } from 'mongoose'
-import { readFile } from 'node:fs/promises'
 import { connectToDatabase } from '@/lib/mongodb'
 import { CsvTemplate } from '@/models/CsvTemplate'
 import { CsvImport } from '@/models/CsvImport'
@@ -125,10 +124,10 @@ export async function createTemplateFromImport(
     throw new Error('Import CSV introuvable.')
   }
 
-  // Rejoue les octets d'origine : c'est la seule façon de retrouver l'encodage
-  // exact et les valeurs telles qu'elles étaient dans le fichier.
-  const buffer = await readFile(csvImport.filePath)
-  const parsed = parseCsvBuffer(buffer)
+  // Rejoue les octets d'origine, relus depuis la base : c'est la seule façon de
+  // retrouver l'encodage exact et les valeurs telles qu'elles étaient dans le
+  // fichier.
+  const parsed = parseCsvBuffer(Buffer.from(csvImport.rawContent))
 
   const template = await CsvTemplate.create({
     name: name?.trim() || defaultTemplateName(csvImport.originalFileName),

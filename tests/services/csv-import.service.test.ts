@@ -1,13 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
-import { readdir, readFile, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
 import { withTestDatabase } from '../helpers/db'
 import { assertCsvFile, createCsvImport } from '@/services/csv-import.service'
 import { CsvImport } from '@/models/CsvImport'
-
-// Même chemin que UPLOAD_DIR dans le service : non exporté, donc reconstruit
-// ici pour observer le disque sans dépendre d'un mock de fs/promises.
-const UPLOAD_DIR = join(process.cwd(), 'uploads', 'csv')
 
 withTestDatabase()
 
@@ -36,7 +30,7 @@ describe('assertCsvFile', () => {
 })
 
 describe('createCsvImport', () => {
-  it('enregistre les métadonnées et écrit le fichier brut sur disque', async () => {
+  it('enregistre les métadonnées et stocke les octets bruts dans le document', async () => {
     const result = await createCsvImport({
       buffer: csv(),
       originalFileName: 'produits.csv',
@@ -49,10 +43,11 @@ describe('createCsvImport', () => {
     const doc = await CsvImport.findById(result.importId)
     expect(doc).not.toBeNull()
 
-    // Les octets exacts doivent survivre : c'est ce qui permettra de
-    // re-décoder fidèlement à la création du template.
-    expect(await readFile(doc!.filePath)).toEqual(csv())
-    await rm(doc!.filePath, { force: true })
+    // Les octets exacts doivent survivre en base : c'est ce qui permet de
+    // re-décoder fidèlement à la création du template, sans dépendre d'un
+    // disque local (indisponible en serverless).
+    expect(Buffer.from(doc!.rawContent).equals(csv())).toBe(true)
+    expect(doc!.fileSize).toBe(csv().byteLength)
   })
 
   it('ne stocke pas les lignes dans le document', async () => {
@@ -64,10 +59,9 @@ describe('createCsvImport', () => {
 
     const doc = await CsvImport.findById(result.importId).lean()
     expect(doc).not.toHaveProperty('rows')
-    await rm((doc as { filePath: string }).filePath, { force: true })
   })
 
-  it('nettoie le nom de fichier pour empêcher une traversée de répertoire', async () => {
+  it('nettoie le nom de fichier d’origine', async () => {
     const result = await createCsvImport({
       buffer: csv(),
       originalFileName: '../../../etc/passwd.csv',
@@ -75,29 +69,6 @@ describe('createCsvImport', () => {
     })
 
     const doc = await CsvImport.findById(result.importId)
-    expect(doc!.filePath).not.toContain('..')
     expect(doc!.originalFileName).toBe('passwd.csv')
-    await rm(doc!.filePath, { force: true })
-  })
-
-  it('supprime le fichier écrit sur disque si la création du document Mongo échoue', async () => {
-    const before = new Set(await readdir(UPLOAD_DIR).catch(() => []))
-
-    const createSpy = vi
-      .spyOn(CsvImport, 'create')
-      .mockRejectedValueOnce(new Error('échec Mongo simulé'))
-
-    await expect(
-      createCsvImport({ buffer: csv(), originalFileName: 'produits.csv', mimeType: 'text/csv' }),
-    ).rejects.toThrow('échec Mongo simulé')
-
-    // Le fichier a bien été écrit (create a été appelé après writeFile), puis
-    // supprimé par le catch : aucun fichier neuf ne doit subsister.
-    expect(createSpy).toHaveBeenCalled()
-    createSpy.mockRestore()
-
-    const after = await readdir(UPLOAD_DIR).catch(() => [])
-    const newFiles = after.filter((name) => !before.has(name))
-    expect(newFiles).toEqual([])
   })
 })
