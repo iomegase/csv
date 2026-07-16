@@ -1074,7 +1074,10 @@ export async function beginInvoiceAnalysis(pdf: Buffer): Promise<{ operationLoca
 export async function pollInvoiceAnalysis(
   operationLocation: string,
 ): Promise<{ status: 'running' | 'succeeded' | 'failed'; result?: unknown; error?: string }> {
-  const { key } = azureConfig()
+  const key = process.env.AZURE_DOCUMENT_INTELLIGENCE_KEY
+  if (!key) {
+    throw new Error('AZURE_DOCUMENT_INTELLIGENCE_KEY manquant.')
+  }
 
   const response = await fetch(operationLocation, {
     headers: { 'Ocp-Apim-Subscription-Key': key },
