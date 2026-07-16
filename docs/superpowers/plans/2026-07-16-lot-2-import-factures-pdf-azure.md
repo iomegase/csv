@@ -943,6 +943,8 @@ Ces deux fonctions encapsulent tout l'accès réseau Azure. Elles lisent l'endpo
 npm install @azure-rest/ai-document-intelligence
 ```
 
+> **Note (post-revue) :** le service final utilise `fetch` brut et n'importe jamais ce SDK. La dépendance a donc été retirée après la revue finale (`npm uninstall @azure-rest/ai-document-intelligence`) : cette étape est conservée pour l'historique mais n'est plus nécessaire.
+
 - [ ] **Étape 2 : Écrire le test qui échoue**
 
 Créer `tests/services/azure-invoice.service.test.ts` :
