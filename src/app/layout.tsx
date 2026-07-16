@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { AppSidebar } from '@/components/AppSidebar'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -13,7 +14,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           attributs au body avant l'hydratation, ce que le serveur ne peut pas
           anticiper. La suppression ne porte que sur le body lui-même : les
           écarts dans les enfants continuent d'être signalés. */}
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <div className="flex min-h-screen bg-slate-50">
+          <AppSidebar />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
+      </body>
     </html>
   )
 }
