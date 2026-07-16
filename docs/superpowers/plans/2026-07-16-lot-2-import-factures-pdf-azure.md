@@ -2456,7 +2456,7 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">{invoice.originalFileName}</h1>
         <div className="flex flex-wrap gap-2">
-          {(invoice.status === 'error' || invoice.status === 'succeeded') && (
+          {!locked && (invoice.status === 'error' || invoice.status === 'succeeded') && (
             <button type="button" onClick={reanalyze} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
               <RefreshCw className="h-4 w-4" /> Relancer l’analyse
             </button>
@@ -2523,9 +2523,11 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
           <button type="button" onClick={saveItems} className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
             Enregistrer les lignes
           </button>
-          <button type="button" onClick={validate} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
-            Valider la facture
-          </button>
+          {invoice.status === 'succeeded' && (
+            <button type="button" onClick={validate} className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500">
+              Valider la facture
+            </button>
+          )}
         </div>
       )}
     </div>
