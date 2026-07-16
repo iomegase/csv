@@ -24,6 +24,7 @@ describe('InvoiceImport', () => {
 
   it('refuse un statut hors énumération', async () => {
     await expect(
+      // @ts-expect-error statut hors énumération : rejet vérifié au runtime
       InvoiceImport.create({ ...base(), status: 'inconnu' }),
     ).rejects.toThrow(/status/)
   })

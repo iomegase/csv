@@ -68,7 +68,7 @@ export async function refreshAnalysis(id: string): Promise<InvoiceImportDoc> {
 
   if (outcome.status === 'succeeded') {
     doc.azureRawResult = outcome.result ?? null
-    doc.items = normalizeAzureInvoice(outcome.result)
+    doc.set('items', normalizeAzureInvoice(outcome.result))
     doc.status = 'succeeded'
     doc.errorMessage = null
   } else if (outcome.status === 'failed') {
@@ -109,7 +109,7 @@ export async function getInvoiceImport(id: string): Promise<InvoiceImportDoc> {
 export async function updateInvoiceItems(id: string, items: InvoiceItem[]): Promise<InvoiceImportDoc> {
   const doc = await requireInvoice(id)
   if (doc.validatedAt) throw new Error('Facture validée : édition verrouillée.')
-  doc.items = items
+  doc.set('items', items)
   await doc.save()
   return doc.toObject()
 }
