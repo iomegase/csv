@@ -12,7 +12,7 @@ Mini-application Next.js permettant d’importer, contrôler, modifier et réexp
 
 Les colonnes `Quantité`, `Valeur à la vente` et `Famille` sont détectées automatiquement. Le bouton **Configurer les colonnes** permet de corriger l’association si les intitulés du CSV sont différents.
 
-Tant qu’aucun template n’est actif, les données importées restent dans `sessionStorage` et aucun fichier n’est envoyé à un serveur. Dès qu’un CSV est **défini comme template actif**, il est téléversé, analysé côté serveur et le catalogue est alimenté dans MongoDB : les vues lisent alors le catalogue plutôt que la session.
+L’éditeur travaille sur le fichier que vous importez : les données restent dans `sessionStorage` et rien n’est envoyé à un serveur tant que vous ne cliquez pas sur **Définir comme template actif**. Ce bouton téléverse le CSV, l’analyse côté serveur et alimente le catalogue MongoDB, sans quitter votre fichier. Le catalogue se consulte à part via le lien **Voir le catalogue** (page `/catalogue`).
 
 ## Fonctionnalités
 

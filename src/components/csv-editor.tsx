@@ -101,11 +101,7 @@ export function CsvEditor({ activeView }: CsvEditorProps) {
   const [showMapping, setShowMapping] = useState(false)
   const [lastImportId, setLastImportId] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [templateName, setTemplateName] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
-  // 'session' : lignes issues de sessionStorage. 'catalog' : lignes issues de
-  // MongoDB, non modifiables (D5).
-  const [source, setSource] = useState<'session' | 'catalog'>('session')
 
   const hasData = columns.length > 0
   const activeDefinition = PRODUCT_VIEWS.find((view) => view.id === activeView) ?? PRODUCT_VIEWS[0]
@@ -131,50 +127,6 @@ export function CsvEditor({ activeView }: CsvEditorProps) {
 
     return () => window.clearTimeout(timer)
   }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
-
-    let cancelled = false
-
-    async function loadCatalog() {
-      try {
-        const response = await fetch('/api/catalog/products?pageSize=500')
-        if (!response.ok) return // 404 = pas de template actif : on garde la session.
-
-        const data = await response.json()
-        if (cancelled) return
-
-        setColumns(data.columns)
-        setRows(
-          data.products.map((product: { csvData: Record<string, unknown> }) =>
-            Object.fromEntries(
-              data.columns.map((column: string) => [
-                column,
-                // csvData porte des nombres et des null ; l'éditeur attend des
-                // chaînes. La distinction null / vide est préservée côté
-                // serveur, seul l'affichage est converti.
-                product.csvData[column] === null || product.csvData[column] === undefined
-                  ? ''
-                  : String(product.csvData[column]),
-              ]),
-            ),
-          ),
-        )
-        setDelimiter(data.delimiter)
-        setMapping(detectColumnMapping(data.columns))
-        setTemplateName(data.templateName)
-        setSource('catalog')
-      } catch {
-        // Base injoignable : l'éditeur reste utilisable sur la session.
-      }
-    }
-
-    loadCatalog()
-    return () => {
-      cancelled = true
-    }
-  }, [hydrated])
 
   useEffect(() => {
     if (!hydrated || !hasData) return
@@ -263,11 +215,6 @@ export function CsvEditor({ activeView }: CsvEditorProps) {
         setGlobalSearch('')
         setFilters([])
         setPage(1)
-        // Les lignes affichées viennent désormais du fichier, plus du catalogue :
-        // sans cela le bandeau continuerait d'annoncer MongoDB, et le bouton
-        // « Définir comme template actif » resterait masqué dès qu'un template
-        // est actif — rendant tout ré-import impossible depuis l'interface.
-        setSource('session')
         setSyncMessage('')
         setShowMapping(
           !detectedMapping.stock || !detectedMapping.salePrice || !detectedMapping.family,
@@ -386,17 +333,16 @@ export function CsvEditor({ activeView }: CsvEditorProps) {
 
       const { created, updated, ambiguous, missingFromCsv } = data.summary
 
+      // Pas de rechargement : l'éditeur reste sur le fichier importé. Le
+      // catalogue est mis à jour en arrière-plan et consultable via son lien.
       setSyncMessage(
-        `Template actif. ${created} produit(s) créé(s), ${updated} mis à jour` +
+        `Catalogue mis à jour : ${created} produit(s) créé(s), ${updated} mis à jour` +
           (ambiguous.length ? `, ${ambiguous.length} correspondance(s) ambiguë(s)` : '') +
           (missingFromCsv.length
             ? `, ${missingFromCsv.length} produit(s) du catalogue absent(s) du CSV (conservés)`
             : '') +
           '.',
       )
-
-      // Recharge depuis MongoDB, qui devient la source affichée.
-      window.location.reload()
     } catch (syncError) {
       setError(syncError instanceof Error ? syncError.message : 'Synchronisation impossible.')
     }
@@ -415,31 +361,35 @@ export function CsvEditor({ activeView }: CsvEditorProps) {
   return (
     <main className="min-h-screen p-4 md:p-8">
       <div className="mx-auto max-w-[1800px] space-y-5">
-        {source === 'catalog' && (
-          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-            Données issues du catalogue MongoDB (template «&nbsp;{templateName}&nbsp;»). Les
-            modifications faites ici ne sont pas enregistrées en base : elles n’affectent que
-            l’affichage et l’export local.
-          </div>
-        )}
-
         {syncMessage && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-            {syncMessage}
+            {syncMessage}{' '}
+            <Link href="/catalogue" className="font-medium underline">
+              Voir le catalogue
+            </Link>
           </div>
         )}
 
-        {lastImportId && source === 'session' && (
-          <button
-            type="button"
-            onClick={setAsActiveTemplate}
-            disabled={isUploading}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+        <div className="flex flex-wrap items-center gap-3">
+          {lastImportId && (
+            <button
+              type="button"
+              onClick={setAsActiveTemplate}
+              disabled={isUploading}
+              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Définir comme template actif
+            </button>
+          )}
+          <Link
+            href="/catalogue"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            <FileSpreadsheet className="h-4 w-4" />
-            Définir comme template actif
-          </button>
-        )}
+            <Boxes className="h-4 w-4" />
+            Voir le catalogue
+          </Link>
+        </div>
 
         <header className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
