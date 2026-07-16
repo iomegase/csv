@@ -3,11 +3,14 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { InvoiceImport } from '@/models/InvoiceImport'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { getActiveTemplate } from '@/services/csv-template.service'
-import { detectColumnMapping } from '@/lib/product-views'
-import { detectIdentityMapping, normalizeMatchValue, nameSupplierKey } from '@/lib/catalog-columns'
+import { detectColumnMapping, parseLocalizedNumber } from '@/lib/product-views'
+import { detectIdentityMapping, normalizeMatchValue } from '@/lib/catalog-columns'
 import type { InvoiceItem } from '@/models/InvoiceImport'
 
-type MatchKey = 'reference' | 'barcode' | 'nameSupplier'
+// Ordre de priorité de l'appariement (R1.2) : code-barres → référence → nom.
+// Le nom est apparié SEUL (sans fournisseur) car, sur les données réelles, la
+// facture ne porte ni référence ni code-barres — l'identité est dans le Nom.
+type MatchKey = 'barcode' | 'reference' | 'name'
 
 export interface ApplyInvoiceSummary {
   updated: number
@@ -21,13 +24,29 @@ interface IndexedProduct {
   reference: string | null
   barcode: string | null
   name: string | null
-  supplier: string | null
+  csvData: Record<string, unknown> | null
+}
+
+interface NewGroup {
+  qty: number
+  reference: string | null
+  barcode: string | null
+  description: string | null
 }
 
 /**
  * Applique une facture validée au catalogue en AJOUTANT la quantité de chaque
- * ligne au stock du produit correspondant (facture = marchandise reçue, D1).
- * Un produit inconnu est créé (D2) ; un cas ambigu n'est jamais écrit (D4).
+ * ligne au stock du produit correspondant (facture = marchandise reçue, D1/R1.1).
+ *
+ * Appariement par identité réellement présente : code-barres → référence → nom
+ * normalisé (R1.2). Aucune donnée n'est inventée (R1.3) : les champs absents
+ * restent vides. Un nom absent crée un nouveau produit (R1.4/D2) ; plusieurs
+ * candidats pour une même clé sont ambigus et jamais écrits (R1.5/D4).
+ *
+ * Les lignes visant le même produit sont agrégées avant écriture (R1.6), et le
+ * stock existant est lu via `parseLocalizedNumber` — jamais par coercition
+ * numérique brute qui détruirait « 1 200 » ou « 12,5 » (R1.7).
+ *
  * Hors transaction : `appliedToCatalogAt` garantit qu'on n'applique qu'une fois.
  */
 export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInvoiceSummary> {
@@ -54,23 +73,30 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
 
   const summary: ApplyInvoiceSummary = { updated: 0, created: 0, ambiguous: [], skipped: [] }
 
+  // Le catalogue est chargé et indexé une fois (csvData compris, pour lire le
+  // stock existant en mémoire) : une requête par ligne serait ruineuse.
   const existing = (await CatalogProduct.find({ isDeleted: false })
-    .select('reference barcode name supplier')
+    .select('reference barcode name csvData')
     .lean()) as unknown as IndexedProduct[]
 
+  const byId = new Map(existing.map((product) => [String(product._id), product]))
+
   const indexes: Record<MatchKey, Map<string, Types.ObjectId[]>> = {
-    reference: new Map(),
     barcode: new Map(),
-    nameSupplier: new Map(),
+    reference: new Map(),
+    name: new Map(),
   }
   for (const product of existing) {
-    addToIndex(indexes.reference, normalizeMatchValue(product.reference), product._id)
     addToIndex(indexes.barcode, normalizeMatchValue(product.barcode), product._id)
-    addToIndex(indexes.nameSupplier, nameSupplierKey(product.name, product.supplier), product._id)
+    addToIndex(indexes.reference, normalizeMatchValue(product.reference), product._id)
+    addToIndex(indexes.name, normalizeMatchValue(product.name), product._id)
   }
 
-  const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
   const templateObjectId = template._id as Types.ObjectId
+
+  // Première passe : résolution + agrégation par produit cible (R1.6).
+  const matchedAdds = new Map<string, number>()
+  const newGroups = new Map<string, NewGroup>()
 
   invoice.items.forEach((item: InvoiceItem, rowIndex: number) => {
     const quantity = item.quantity
@@ -80,8 +106,8 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     }
 
     const match = findMatch(indexes, {
-      reference: item.supplierReference,
       barcode: item.barcode,
+      reference: item.supplierReference,
       name: item.description,
     })
 
@@ -95,52 +121,68 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     }
 
     if (match.status === 'matched') {
-      operations.push({
-        updateOne: {
-          filter: { _id: match.id },
-          update: [
-            {
-              $set: {
-                // $setField (et non une clé objet littérale) : un nom de colonne
-                // avec un point (ex. « Qté. ») est rejeté par le parseur de
-                // chemins de l'agrégation même comme clé de document littéral ;
-                // $setField la traite comme une chaîne opaque, symétrique du
-                // $getField utilisé en lecture dans currentStockExpression.
-                csvData: {
-                  $setField: {
-                    field: stockColumn,
-                    input: '$csvData',
-                    value: {
-                      $toString: {
-                        $add: [currentStockExpression(stockColumn), quantity],
-                      },
-                    },
-                  },
-                },
-                lastUpdatedFromInvoiceId: new Types.ObjectId(invoiceId),
-              },
-            },
-          ],
-        },
-      })
-      summary.updated += 1
+      const key = String(match.id)
+      matchedAdds.set(key, (matchedAdds.get(key) ?? 0) + quantity)
       return
     }
 
-    // Aucun match : création à partir des colonnes d'identité du template.
+    // Aucun match : nouveau produit, dédupliqué sur la première clé non vide.
+    const nbc = normalizeMatchValue(item.barcode)
+    const nref = normalizeMatchValue(item.supplierReference)
+    const nnm = normalizeMatchValue(item.description)
+    const dedupeKey = nbc ? `b:${nbc}` : nref ? `r:${nref}` : nnm ? `n:${nnm}` : `i:${rowIndex}`
+    const group = newGroups.get(dedupeKey)
+    if (group) group.qty += quantity
+    else
+      newGroups.set(dedupeKey, {
+        qty: quantity,
+        reference: item.supplierReference ?? null,
+        barcode: item.barcode ?? null,
+        description: item.description ?? null,
+      })
+  })
+
+  // Seconde passe : une écriture par produit distinct.
+  const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
+
+  for (const [idStr, addQty] of matchedAdds) {
+    const product = byId.get(idStr)
+    const cell = product?.csvData?.[stockColumn]
+    const current = cell === undefined || cell === null ? 0 : (parseLocalizedNumber(String(cell)) ?? 0)
+    const newStock = current + addQty
+    operations.push({
+      updateOne: {
+        filter: { _id: new Types.ObjectId(idStr) },
+        update: [
+          {
+            $set: {
+              // $setField (clé littérale) : un nom de colonne avec espace ou
+              // point (ex. « Gestion du stock », « Qté. ») ne doit pas être
+              // interprété comme un chemin pointé.
+              csvData: { $setField: { field: stockColumn, input: '$csvData', value: String(newStock) } },
+              lastUpdatedFromInvoiceId: new Types.ObjectId(invoiceId),
+            },
+          },
+        ],
+      },
+    })
+    summary.updated += 1
+  }
+
+  for (const group of newGroups.values()) {
     const csvData: Record<string, string> = {}
-    if (identityColumns.reference && item.supplierReference) csvData[identityColumns.reference] = item.supplierReference
-    if (identityColumns.barcode && item.barcode) csvData[identityColumns.barcode] = item.barcode
-    if (identityColumns.name && item.description) csvData[identityColumns.name] = item.description
-    csvData[stockColumn] = String(quantity)
+    if (identityColumns.reference && group.reference) csvData[identityColumns.reference] = group.reference
+    if (identityColumns.barcode && group.barcode) csvData[identityColumns.barcode] = group.barcode
+    if (identityColumns.name && group.description) csvData[identityColumns.name] = group.description
+    csvData[stockColumn] = String(group.qty)
 
     operations.push({
       insertOne: {
         document: {
           templateId: templateObjectId,
-          reference: item.supplierReference ?? null,
-          barcode: item.barcode ?? null,
-          name: item.description ?? null,
+          reference: group.reference,
+          barcode: group.barcode,
+          name: group.description,
           supplier: null,
           csvData,
           originalCsvData: csvData,
@@ -150,7 +192,7 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
       },
     })
     summary.created += 1
-  })
+  }
 
   if (operations.length) {
     await CatalogProduct.bulkWrite(operations, { ordered: false })
@@ -162,24 +204,8 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
   return summary
 }
 
-/**
- * Expression d'agrégation : stock actuel converti en nombre. Une cellule vide,
- * absente ou illisible vaut 0 (jamais null dans une somme). `$getField` (et non
- * `$csvData.<col>`) car un nom de colonne peut contenir des espaces ou des points,
- * qui seraient sinon interprétés comme un chemin imbriqué en notation pointée.
- */
-function currentStockExpression(stockColumn: string) {
-  return {
-    $convert: {
-      input: { $getField: { field: stockColumn, input: '$csvData' } },
-      to: 'double',
-      onError: 0,
-      onNull: 0,
-    },
-  }
-}
-
 function addToIndex(index: Map<string, Types.ObjectId[]>, key: string, id: Types.ObjectId) {
+  // Une valeur vide n'identifie personne.
   if (!key) return
   const bucket = index.get(key)
   if (bucket) bucket.push(id)
@@ -193,20 +219,19 @@ type MatchOutcome =
 
 function findMatch(
   indexes: Record<MatchKey, Map<string, Types.ObjectId[]>>,
-  identity: { reference: string | null; barcode: string | null; name: string | null },
+  identity: { barcode: string | null; reference: string | null; name: string | null },
 ): MatchOutcome {
   const candidates: Array<[MatchKey, string]> = [
-    ['reference', normalizeMatchValue(identity.reference)],
     ['barcode', normalizeMatchValue(identity.barcode)],
-    // Pas de fournisseur au niveau ligne de facture : nom seul ne suffit pas à
-    // fabriquer une clé nameSupplier, donc ce candidat reste vide en pratique.
-    ['nameSupplier', nameSupplierKey(identity.name, null)],
+    ['reference', normalizeMatchValue(identity.reference)],
+    ['name', normalizeMatchValue(identity.name)],
   ]
 
   for (const [matchedBy, key] of candidates) {
     if (!key) continue
     const bucket = indexes[matchedBy].get(key)
     if (!bucket?.length) continue
+    // Plusieurs candidats : on ne choisit pas à la place de l'utilisateur.
     if (bucket.length > 1) return { status: 'ambiguous', matchedBy, candidateIds: bucket }
     return { status: 'matched', id: bucket[0], matchedBy }
   }

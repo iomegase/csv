@@ -44,6 +44,34 @@ factures au catalogue — c'est le cœur de ce lot.
   colonne stock reconnaissable, l'application échoue avec un message explicite ;
   on n'invente pas de colonne.
 
+## Révision R1 (2026-07-16) — appariement par Nom, non par référence/code-barres
+
+Après confrontation aux données réelles (facture Heidi + export ShopCaisse), le
+modèle d'identité initial (référence → code-barres → nom+fournisseur) s'est
+révélé inadapté et a créé des doublons. Corrections décidées avec le pilote :
+
+- **R1.1 — Source de vérité = template actif.** La vue « Produits » = les
+  produits de la source de vérité **plus les mouvements de stock** : `+` entrées
+  d'une facture (ce lot), `−` sorties/ventes (évolution future, hors périmètre).
+- **R1.2 — Appariement par identité réellement présente**, priorité
+  code-barres → référence → **Nom normalisé (sans exiger de fournisseur)**. Dans
+  les données du pilote, référence et code-barres sont vides côté facture (le
+  code produit est dans le Nom, ex. `[DP0001] …`), donc le **Nom** est la clé
+  effective. Remplace la clé `nameSupplier` de la conception initiale.
+- **R1.3 — Ne rien combler.** On distribue chaque valeur de la facture dans sa
+  colonne, telle quelle ; les champs absents (référence, code-barres,
+  fournisseur) restent vides. Aucune extraction/synthèse d'identifiant.
+- **R1.4 — Nom absent → nouveau produit** (option b du pilote) : ajouté à la vue
+  comme nouvelle ligne, données distribuées, champs manquants vides. Conserve D2.
+- **R1.5 — Même nom en double dans le catalogue → ambigu**, non écrit, signalé.
+- **R1.6 — Anti-doublon intra-facture** : plusieurs lignes visant le même produit
+  (même clé) sont agrégées avant écriture (une seule fiche mise à jour/créée).
+- **R1.7 — Lecture du stock existant via `parseLocalizedNumber`**, jamais par
+  coercition numérique brute (`$convert to double` détruit `"1 200"`, `"12,5"`).
+
+Ces points R1.* prévalent sur D2/D4 et la stratégie d'appariement du lot 6
+initial là où ils divergent.
+
 ## Périmètre
 
 ### 1. Suppression de l'authentification

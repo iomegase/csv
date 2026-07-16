@@ -133,6 +133,95 @@ describe('applyInvoiceToCatalog', () => {
     expect(product!.csvData).toMatchObject({ Quantité: '5' })
   })
 
+  it('apparie par nom quand référence et code-barres sont absents (R1.2)', async () => {
+    await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId: (await CsvTemplate.findOne({}))!._id,
+      name: '[DP0001] Dessous de plat sapin blanc',
+      csvData: { Nom: '[DP0001] Dessous de plat sapin blanc', Quantité: '10' },
+    })
+    const invoiceId = await makeInvoice([
+      emptyItem({ description: '[DP0001] Dessous de plat sapin blanc', quantity: 6 }),
+    ])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.updated).toBe(1)
+    expect(summary.created).toBe(0)
+    const product = await CatalogProduct.findOne({
+      name: '[DP0001] Dessous de plat sapin blanc',
+    }).lean()
+    expect(product!.csvData).toMatchObject({ Quantité: '16' })
+    expect(String(product!.lastUpdatedFromInvoiceId)).toBe(invoiceId)
+  })
+
+  it('lit un stock existant localisé (séparateur de milliers) sans le détruire (R1.7)', async () => {
+    await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId: (await CsvTemplate.findOne({}))!._id,
+      reference: 'LOC-1',
+      name: 'Carton',
+      csvData: { Nom: 'Carton', Référence: 'LOC-1', Quantité: '1 200' },
+    })
+    const invoiceId = await makeInvoice([emptyItem({ supplierReference: 'LOC-1', quantity: 6 })])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.updated).toBe(1)
+    const product = await CatalogProduct.findOne({ reference: 'LOC-1' }).lean()
+    expect(product!.csvData).toMatchObject({ Quantité: '1206' })
+  })
+
+  it('agrège plusieurs lignes visant le même produit existant (R1.6)', async () => {
+    await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId: (await CsvTemplate.findOne({}))!._id,
+      reference: 'SUM-1',
+      name: 'Sac',
+      csvData: { Nom: 'Sac', Référence: 'SUM-1', Quantité: '10' },
+    })
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'SUM-1', quantity: 6 }),
+      emptyItem({ supplierReference: 'SUM-1', quantity: 4 }),
+    ])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.updated).toBe(1)
+    const product = await CatalogProduct.findOne({ reference: 'SUM-1' }).lean()
+    expect(product!.csvData).toMatchObject({ Quantité: '20' })
+  })
+
+  it('agrège plusieurs lignes d’un même nouveau produit (R1.6)', async () => {
+    await makeActiveTemplate()
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'NEW-2', description: 'Pot', quantity: 3 }),
+      emptyItem({ supplierReference: 'NEW-2', description: 'Pot', quantity: 5 }),
+    ])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.created).toBe(1)
+    expect(await CatalogProduct.countDocuments({})).toBe(1)
+    const product = await CatalogProduct.findOne({ reference: 'NEW-2' }).lean()
+    expect(product!.csvData).toMatchObject({ Quantité: '8' })
+  })
+
+  it('signale un nom ambigu (plusieurs produits de même nom) sans écrire (R1.5)', async () => {
+    await makeActiveTemplate()
+    const templateId = (await CsvTemplate.findOne({}))!._id
+    await CatalogProduct.create({ templateId, name: 'Bougie', csvData: { Nom: 'Bougie', Quantité: '1' } })
+    await CatalogProduct.create({ templateId, name: 'Bougie', csvData: { Nom: 'Bougie', Quantité: '2' } })
+    const invoiceId = await makeInvoice([emptyItem({ description: 'Bougie', quantity: 5 })])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.ambiguous).toHaveLength(1)
+    expect(summary.ambiguous[0].matchedBy).toBe('name')
+    expect(summary.updated).toBe(0)
+    expect(summary.created).toBe(0)
+  })
+
   it('ne comptabilise pas un cas ambigu et le signale', async () => {
     await makeActiveTemplate()
     const templateId = (await CsvTemplate.findOne({}))!._id
