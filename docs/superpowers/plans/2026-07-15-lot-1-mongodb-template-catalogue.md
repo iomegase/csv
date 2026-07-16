@@ -1909,7 +1909,7 @@ function normalizeCsvValue(value: unknown): string | null {
 - [ ] **Étape 4 : Vérifier le succès**
 
 Lancer : `npx vitest run tests/services/catalog-sync.service.test.ts`
-Attendu : 12 tests PASS.
+Attendu : 11 tests PASS.
 
 - [ ] **Étape 5 : Commit**
 
