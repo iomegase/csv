@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { readFile, rm } from 'node:fs/promises'
+import { describe, expect, it, vi } from 'vitest'
+import { readdir, readFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { withTestDatabase } from '../helpers/db'
 import { assertCsvFile, createCsvImport } from '@/services/csv-import.service'
 import { CsvImport } from '@/models/CsvImport'
+
+// Même chemin que UPLOAD_DIR dans le service : non exporté, donc reconstruit
+// ici pour observer le disque sans dépendre d'un mock de fs/promises.
+const UPLOAD_DIR = join(process.cwd(), 'uploads', 'csv')
 
 withTestDatabase()
 
@@ -23,6 +28,10 @@ describe('assertCsvFile', () => {
 
   it('refuse un fichier trop volumineux', () => {
     expect(() => assertCsvFile('produits.csv', 'text/csv', 11 * 1024 * 1024)).toThrow(/volumineux/)
+  })
+
+  it('refuse un type MIME interdit malgré une extension .csv', () => {
+    expect(() => assertCsvFile('produits.csv', 'application/pdf', 1000)).toThrow(/refusé/)
   })
 })
 
@@ -69,5 +78,26 @@ describe('createCsvImport', () => {
     expect(doc!.filePath).not.toContain('..')
     expect(doc!.originalFileName).toBe('passwd.csv')
     await rm(doc!.filePath, { force: true })
+  })
+
+  it('supprime le fichier écrit sur disque si la création du document Mongo échoue', async () => {
+    const before = new Set(await readdir(UPLOAD_DIR).catch(() => []))
+
+    const createSpy = vi
+      .spyOn(CsvImport, 'create')
+      .mockRejectedValueOnce(new Error('échec Mongo simulé'))
+
+    await expect(
+      createCsvImport({ buffer: csv(), originalFileName: 'produits.csv', mimeType: 'text/csv' }),
+    ).rejects.toThrow('échec Mongo simulé')
+
+    // Le fichier a bien été écrit (create a été appelé après writeFile), puis
+    // supprimé par le catch : aucun fichier neuf ne doit subsister.
+    expect(createSpy).toHaveBeenCalled()
+    createSpy.mockRestore()
+
+    const after = await readdir(UPLOAD_DIR).catch(() => [])
+    const newFiles = after.filter((name) => !before.has(name))
+    expect(newFiles).toEqual([])
   })
 })

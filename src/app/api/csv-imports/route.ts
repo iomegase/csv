@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server'
 import { createCsvImport } from '@/services/csv-import.service'
+import { csvUploadSchema } from '@/lib/validations/csv-template.schema'
 
 export async function POST(request: Request) {
   try {
     const formData = await request.formData()
-    const file = formData.get('file')
+    const parsed = csvUploadSchema.safeParse(Object.fromEntries(formData))
 
-    if (!(file instanceof File)) {
+    if (!parsed.success) {
       return NextResponse.json(
         { error: 'missing_file', message: 'Aucun fichier reçu sous la clé « file ».' },
         { status: 400 },
       )
     }
+
+    const { file } = parsed.data
 
     const result = await createCsvImport({
       buffer: Buffer.from(await file.arrayBuffer()),
