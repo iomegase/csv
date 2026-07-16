@@ -129,7 +129,7 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">{invoice.originalFileName}</h1>
         <div className="flex flex-wrap gap-2">
-          {!locked && (invoice.status === 'error' || invoice.status === 'succeeded') && (
+          {!locked && (invoice.status === 'pending' || invoice.status === 'error' || invoice.status === 'succeeded') && (
             <button type="button" onClick={reanalyze} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
               <RefreshCw className="h-4 w-4" /> Relancer l’analyse
             </button>

@@ -47,6 +47,7 @@ export async function createInvoiceImport(input: {
 /** Soumet à Azure et passe en processing. Relançable depuis error/succeeded. */
 export async function startAnalysis(id: string): Promise<InvoiceImportDoc> {
   const doc = await requireInvoice(id)
+  if (doc.validatedAt) throw new Error('Facture validée : édition verrouillée.')
   const { operationLocation } = await beginInvoiceAnalysis(Buffer.from(doc.pdfContent))
 
   doc.status = 'processing'

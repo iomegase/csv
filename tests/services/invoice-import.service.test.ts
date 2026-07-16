@@ -123,6 +123,13 @@ describe('correction et validation', () => {
     expect(doc!.validatedAt).not.toBeNull()
     await expect(updateInvoiceItems(invoiceId, oneItem)).rejects.toThrow(/validée/)
   })
+
+  it('startAnalysis refuse une facture validée', async () => {
+    await makeActiveTemplate()
+    const { invoiceId } = await createInvoiceImport({ buffer: PDF(), originalFileName: 'f.pdf', mimeType: 'application/pdf' })
+    await validateInvoice(invoiceId)
+    await expect(startAnalysis(invoiceId)).rejects.toThrow(/validée/)
+  })
 })
 
 describe('export et suppression', () => {

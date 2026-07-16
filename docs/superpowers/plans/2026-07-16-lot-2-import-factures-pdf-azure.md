@@ -1257,6 +1257,13 @@ describe('correction et validation', () => {
     expect(doc!.validatedAt).not.toBeNull()
     await expect(updateInvoiceItems(invoiceId, oneItem)).rejects.toThrow(/validée/)
   })
+
+  it('startAnalysis refuse une facture validée', async () => {
+    await makeActiveTemplate()
+    const { invoiceId } = await createInvoiceImport({ buffer: PDF(), originalFileName: 'f.pdf', mimeType: 'application/pdf' })
+    await validateInvoice(invoiceId)
+    await expect(startAnalysis(invoiceId)).rejects.toThrow(/validée/)
+  })
 })
 
 describe('export et suppression', () => {
@@ -1339,6 +1346,7 @@ export async function createInvoiceImport(input: {
 /** Soumet à Azure et passe en processing. Relançable depuis error/succeeded. */
 export async function startAnalysis(id: string): Promise<InvoiceImportDoc> {
   const doc = await requireInvoice(id)
+  if (doc.validatedAt) throw new Error('Facture validée : édition verrouillée.')
   const { operationLocation } = await beginInvoiceAnalysis(Buffer.from(doc.pdfContent))
 
   doc.status = 'processing'
@@ -2456,7 +2464,7 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">{invoice.originalFileName}</h1>
         <div className="flex flex-wrap gap-2">
-          {!locked && (invoice.status === 'error' || invoice.status === 'succeeded') && (
+          {!locked && (invoice.status === 'pending' || invoice.status === 'error' || invoice.status === 'succeeded') && (
             <button type="button" onClick={reanalyze} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">
               <RefreshCw className="h-4 w-4" /> Relancer l’analyse
             </button>
