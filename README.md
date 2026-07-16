@@ -12,7 +12,7 @@ Mini-application Next.js permettant d’importer, contrôler, modifier et réexp
 
 Les colonnes `Quantité`, `Valeur à la vente` et `Famille` sont détectées automatiquement. Le bouton **Configurer les colonnes** permet de corriger l’association si les intitulés du CSV sont différents.
 
-Les données importées sont conservées dans `sessionStorage` afin de rester disponibles lors du passage d’une page à l’autre. Aucun fichier n’est envoyé à un serveur.
+Tant qu’aucun template n’est actif, les données importées restent dans `sessionStorage` et aucun fichier n’est envoyé à un serveur. Dès qu’un CSV est **défini comme template actif**, il est téléversé, analysé côté serveur et le catalogue est alimenté dans MongoDB : les vues lisent alors le catalogue plutôt que la session.
 
 ## Fonctionnalités
 
@@ -25,14 +25,33 @@ Les données importées sont conservées dans `sessionStorage` afin de rester di
 - export complet ou export de la page active ;
 - encodage UTF-8 avec BOM pour Excel.
 
-## Installation
+## Développement
 
 ```bash
 npm install
+cp .env.example .env.local
+npm run mongo:start   # MongoDB dédié, port 27018, replica set (transactions)
 npm run dev
 ```
 
+`npm run mongo:start` est à relancer après chaque redémarrage de la machine.
+Les transactions exigent un replica set : le service MongoDB par défaut du port
+27017, en standalone, ne convient pas.
+
 Ouvrir `http://localhost:3000`.
+
+### Mise en route du catalogue
+
+1. Importer un CSV ShopCaisse depuis `/tous-les-produits`.
+2. Cliquer « Définir comme template actif » : le template est créé et le
+   catalogue synchronisé.
+3. Consulter `/catalogue` et exporter au format ShopCaisse.
+
+### Tests
+
+```bash
+npm test
+```
 
 ## Vérifications
 
