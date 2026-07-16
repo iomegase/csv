@@ -1971,7 +1971,12 @@ export function CsvTemplateManager() {
   }
 
   useEffect(() => {
-    refresh().catch(() => setError('Chargement impossible.'))
+    // setTimeout(…,0) : diffère l'appel hors du corps synchrone de l'effet (convention csv-editor, règle set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      refresh().catch(() => setError('Chargement impossible.'))
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
 
   async function importCsv(file: File) {
