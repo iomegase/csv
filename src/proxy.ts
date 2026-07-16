@@ -5,7 +5,7 @@ import { ADMIN_COOKIE, verifySession } from '@/lib/admin-auth'
 // Exemptés de la garde : la page et la route de connexion, sinon boucle.
 const PUBLIC_PATHS = ['/admin/login', '/api/admin/login']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
     return NextResponse.next()

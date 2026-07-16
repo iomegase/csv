@@ -188,7 +188,7 @@ git commit -m "Ajoute la signature du jeton de session admin"
 - Créer : `src/lib/validations/admin.schema.ts`
 - Créer : `src/app/api/admin/login/route.ts`
 - Créer : `src/app/api/admin/logout/route.ts`
-- Créer : `src/middleware.ts`
+- Créer : `src/middleware.ts` — **renommé `src/proxy.ts` après coup** : Next 16 déprécie la convention « middleware » au profit de « proxy » (fonction exportée `proxy`, `config` inchangée).
 
 **Interfaces :**
 - Consomme : `signSession`, `verifySession`, `ADMIN_COOKIE`, `constantTimeEqual` (tâche 1).
