@@ -2599,7 +2599,7 @@ export async function GET(request: Request) {
 - [ ] **Étape 5 : Vérifier le succès**
 
 Lancer : `npx vitest run tests/services/catalog-export.service.test.ts`
-Attendu : 10 tests PASS.
+Attendu : 9 tests PASS.
 
 - [ ] **Étape 6 : Commit**
 
