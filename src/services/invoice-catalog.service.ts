@@ -101,9 +101,20 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
           update: [
             {
               $set: {
-                [`csvData.${stockColumn}`]: {
-                  $toString: {
-                    $add: [currentStockExpression(stockColumn), quantity],
+                // $setField (et non une clé objet littérale) : un nom de colonne
+                // avec un point (ex. « Qté. ») est rejeté par le parseur de
+                // chemins de l'agrégation même comme clé de document littéral ;
+                // $setField la traite comme une chaîne opaque, symétrique du
+                // $getField utilisé en lecture dans currentStockExpression.
+                csvData: {
+                  $setField: {
+                    field: stockColumn,
+                    input: '$csvData',
+                    value: {
+                      $toString: {
+                        $add: [currentStockExpression(stockColumn), quantity],
+                      },
+                    },
                   },
                 },
                 lastUpdatedFromInvoiceId: new Types.ObjectId(invoiceId),
@@ -154,7 +165,8 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
 /**
  * Expression d'agrégation : stock actuel converti en nombre. Une cellule vide,
  * absente ou illisible vaut 0 (jamais null dans une somme). `$getField` (et non
- * `$csvData.<col>`) car un nom de colonne peut contenir des espaces.
+ * `$csvData.<col>`) car un nom de colonne peut contenir des espaces ou des points,
+ * qui seraient sinon interprétés comme un chemin imbriqué en notation pointée.
  */
 function currentStockExpression(stockColumn: string) {
   return {

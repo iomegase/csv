@@ -65,6 +65,41 @@ describe('applyInvoiceToCatalog', () => {
     expect(String(product!.lastUpdatedFromInvoiceId)).toBe(invoiceId)
   })
 
+  it('ajoute la quantité sur une colonne stock dont le nom contient un point, sans créer de sous-objet imbriqué', async () => {
+    // Régression : un $set d'agrégation avec une clé `csvData.${col}` en
+    // notation pointée scinderait "Qté." en ["csvData","Qté",""] et créerait
+    // un sous-objet au lieu d'écrire la vraie colonne. L'écriture doit passer
+    // par une clé littérale, symétrique de la lecture par $getField.
+    await CsvTemplate.create({
+      name: 'TDot',
+      sourceFileName: 't.csv',
+      columns: ['Nom', 'Référence', 'Qté.'].map((name, position) => ({
+        name,
+        position,
+        detectedType: 'string',
+      })),
+      delimiter: ';',
+      isActive: true,
+    })
+    await CatalogProduct.create({
+      templateId: (await CsvTemplate.findOne({}))!._id,
+      reference: 'DOT-001',
+      name: 'Boîte',
+      csvData: { Nom: 'Boîte', Référence: 'DOT-001', 'Qté.': '10' },
+    })
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'DOT-001', description: 'Boîte', quantity: 6 }),
+    ])
+
+    const summary = await applyInvoiceToCatalog(invoiceId)
+
+    expect(summary.updated).toBe(1)
+    const product = await CatalogProduct.findOne({ reference: 'DOT-001' }).lean()
+    expect(product!.csvData).toMatchObject({ 'Qté.': '16' })
+    expect(Object.prototype.hasOwnProperty.call(product!.csvData as object, 'Qté.')).toBe(true)
+    expect(Object.prototype.hasOwnProperty.call(product!.csvData as object, 'Qté')).toBe(false)
+  })
+
   it('crée un produit inconnu avec le stock de la facture', async () => {
     await makeActiveTemplate()
     const invoiceId = await makeInvoice([
