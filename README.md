@@ -53,6 +53,30 @@ Ouvrir `http://localhost:3000`.
 npm test
 ```
 
+## Espace administrateur (lot 2)
+
+Protégé par mot de passe (`ADMIN_PASSWORD`), accessible sous `/admin` :
+
+- **Import CSV** (`/admin/csv-template`) : importer un template CSV ShopCaisse et
+  lister les imports.
+- **Import facture** (`/admin/invoices`) : importer une facture PDF, la faire
+  analyser par Azure Document Intelligence, corriger les lignes extraites, valider,
+  puis télécharger le CSV au format du template actif.
+
+### Variables d'environnement supplémentaires
+
+```bash
+ADMIN_PASSWORD=...                              # mot de passe de l'espace admin
+SESSION_SECRET=...                              # clé de signature du cookie de session
+AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=...        # endpoint Azure Document Intelligence
+AZURE_DOCUMENT_INTELLIGENCE_KEY=...             # clé Azure
+# MAX_PDF_BYTES=15728640                        # optionnel : plafond de taille des PDF
+```
+
+Les factures ne sont jamais analysées côté client : le PDF est envoyé au serveur,
+qui appelle Azure avec des clés confidentielles. La conversion ne remplit que les
+colonnes du template ayant une correspondance ; les autres restent vides.
+
 ## Vérifications
 
 ```bash
