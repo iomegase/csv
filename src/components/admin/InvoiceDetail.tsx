@@ -118,6 +118,7 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
   }
 
   async function remove() {
+    if (!window.confirm('Supprimer cette facture ? Cette action est définitive.')) return
     await fetch(`/api/admin/invoices/${invoiceId}`, { method: 'DELETE' })
     router.push('/admin/invoices')
   }

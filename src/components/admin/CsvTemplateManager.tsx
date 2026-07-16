@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { Trash2, Upload } from 'lucide-react'
 
 interface CsvImportRow {
   id: string
@@ -64,6 +64,17 @@ export function CsvTemplateManager() {
     }
   }
 
+  async function removeImport(id: string) {
+    if (!window.confirm('Supprimer cet import CSV ? Cette action est définitive.')) return
+    setError('')
+    const response = await fetch(`/api/admin/csv-imports/${id}`, { method: 'DELETE' })
+    if (!response.ok) {
+      setError('Suppression impossible.')
+      return
+    }
+    await refresh()
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -106,12 +117,13 @@ export function CsvTemplateManager() {
               <th className="px-4 py-3 font-medium">Colonnes</th>
               <th className="px-4 py-3 font-medium">Lignes</th>
               <th className="px-4 py-3 font-medium">Date d’import</th>
+              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {imports.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-10 text-center text-slate-500">
                   Aucun import CSV.
                 </td>
               </tr>
@@ -123,6 +135,15 @@ export function CsvTemplateManager() {
                   <td className="px-4 py-2 text-slate-700">{row.rowCount}</td>
                   <td className="px-4 py-2 text-slate-700">
                     {new Date(row.createdAt).toLocaleString('fr-FR')}
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => removeImport(row.id)}
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               ))

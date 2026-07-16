@@ -38,6 +38,7 @@ export function InvoicesList() {
   }, [])
 
   async function remove(id: string) {
+    if (!window.confirm('Supprimer cette facture ? Cette action est définitive.')) return
     await fetch(`/api/admin/invoices/${id}`, { method: 'DELETE' })
     await refresh()
   }
