@@ -2154,7 +2154,11 @@ export function InvoicesList() {
   }
 
   useEffect(() => {
-    refresh().catch(() => setError('Chargement impossible.'))
+    // setTimeout(…,0) : diffère l'appel hors du corps synchrone de l'effet (convention csv-editor, règle set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      refresh().catch(() => setError('Chargement impossible.'))
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   async function remove(id: string) {
@@ -2376,7 +2380,11 @@ export function InvoiceDetail({ invoiceId }: { invoiceId: string }) {
   }, [invoiceId])
 
   useEffect(() => {
-    load().catch(() => setError('Chargement impossible.'))
+    // setTimeout(…,0) : diffère l'appel hors du corps synchrone de l'effet (convention csv-editor, règle set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      load().catch(() => setError('Chargement impossible.'))
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [load])
 
   // Tant que l'analyse tourne, on réinterroge (chaque GET fait un sondage Azure).
