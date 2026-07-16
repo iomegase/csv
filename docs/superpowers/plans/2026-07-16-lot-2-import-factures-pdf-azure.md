@@ -1572,7 +1572,8 @@ export async function DELETE(
     return NextResponse.json({ ok: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Suppression impossible.'
-    return NextResponse.json({ error: 'invoice_delete_failed', message }, { status: 400 })
+    const status = /introuvable|invalide/.test(message) ? 404 : 400
+    return NextResponse.json({ error: 'invoice_delete_failed', message }, { status })
   }
 }
 ```
