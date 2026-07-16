@@ -1,4 +1,5 @@
 import { basename } from 'node:path'
+import { isValidObjectId } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
 import { CsvImport } from '@/models/CsvImport'
 import { parseCsvBuffer } from '@/services/csv-parser.service'
@@ -73,4 +74,12 @@ export async function createCsvImport(input: {
     encodingConfident: parsed.encodingConfident,
     delimiter: parsed.delimiter,
   }
+}
+
+export async function deleteCsvImport(id: string): Promise<void> {
+  if (!isValidObjectId(id)) {
+    throw new Error('Identifiant d’import invalide.')
+  }
+  await connectToDatabase()
+  await CsvImport.findByIdAndDelete(id)
 }
