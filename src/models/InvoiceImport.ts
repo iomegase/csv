@@ -41,6 +41,9 @@ const InvoiceImportSchema = new Schema(
     errorMessage: { type: String, default: null },
     templateIdAtConversion: { type: Schema.Types.ObjectId, ref: 'CsvTemplate', default: null },
     validatedAt: { type: Date, default: null },
+    // Horodatage de l'application au catalogue. Non nul ⇒ stocks déjà ajoutés :
+    // empêche le double comptage (D5).
+    appliedToCatalogAt: { type: Date, default: null },
   },
   { timestamps: true },
 )
