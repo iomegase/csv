@@ -55,7 +55,7 @@ npm test
 
 ## Espace administrateur (lot 2)
 
-Protégé par mot de passe (`ADMIN_PASSWORD`), accessible sous `/admin` :
+Accessible librement sous `/admin` :
 
 - **Import CSV** (`/admin/csv-template`) : importer un template CSV ShopCaisse et
   lister les imports.
@@ -66,8 +66,6 @@ Protégé par mot de passe (`ADMIN_PASSWORD`), accessible sous `/admin` :
 ### Variables d'environnement supplémentaires
 
 ```bash
-ADMIN_PASSWORD=...                              # mot de passe de l'espace admin
-SESSION_SECRET=...                              # clé de signature du cookie de session
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT=...        # endpoint Azure Document Intelligence
 AZURE_DOCUMENT_INTELLIGENCE_KEY=...             # clé Azure
 # MAX_PDF_BYTES=15728640                        # optionnel : plafond de taille des PDF
