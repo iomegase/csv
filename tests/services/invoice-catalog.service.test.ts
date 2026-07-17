@@ -94,6 +94,19 @@ describe('applyInvoiceToCatalog', () => {
     expect(String(product!.createdFromInvoiceId)).toBe(invoiceId)
   })
 
+  it('applique la famille et le fournisseur choisis à l’import aux produits créés', async () => {
+    await makeActiveTemplate()
+    const invoiceId = await makeInvoice([emptyItem({ description: 'Bol', quantity: 4 })], {
+      defaultFamily: 'Vaisselle',
+      defaultSupplier: 'Moulin roty',
+    })
+
+    await applyInvoiceToCatalog(invoiceId)
+
+    const product = await CatalogProduct.findOne({}).lean()
+    expect(product!.csvData).toMatchObject({ Nom: 'Bol', Famille: 'Vaisselle', Fournisseur: 'Moulin roty' })
+  })
+
   it('crée un produit exportable sans Référence — un Nom et une quantité suffisent', async () => {
     await makeActiveTemplate()
     const invoiceId = await makeInvoice([emptyItem({ description: 'Bol artisanal', quantity: 4 })])

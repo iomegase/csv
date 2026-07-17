@@ -19,9 +19,6 @@ export function AppSidebar() {
 
   return (
     <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white p-4">
-      <div className="mb-6 px-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Lecteur CSV
-      </div>
       <nav className="flex flex-1 flex-col gap-1">
         {ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`)

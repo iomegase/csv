@@ -29,6 +29,8 @@ export async function createInvoiceImport(input: {
   buffer: Buffer
   originalFileName: string
   mimeType: string
+  family?: string | null
+  supplier?: string | null
 }): Promise<InvoiceImportResult> {
   const safeName = basename(input.originalFileName)
   assertPdfFile(safeName, input.mimeType, input.buffer.byteLength, input.buffer.subarray(0, 5))
@@ -39,6 +41,8 @@ export async function createInvoiceImport(input: {
     pdfContent: input.buffer,
     fileSize: input.buffer.byteLength,
     status: 'pending',
+    defaultFamily: input.family?.trim() || null,
+    defaultSupplier: input.supplier?.trim() || null,
   })
 
   return { invoiceId: String(doc._id), status: doc.status }

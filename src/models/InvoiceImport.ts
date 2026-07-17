@@ -38,6 +38,10 @@ const InvoiceImportSchema = new Schema(
     azureOperationLocation: { type: String, default: null },
     azureRawResult: { type: Schema.Types.Mixed, default: null },
     items: { type: [InvoiceItemSchema], default: [] },
+    // Famille et fournisseur choisis à l'import : les factures ne les portent
+    // pas. Appliqués aux produits créés lors de l'intégration au catalogue.
+    defaultFamily: { type: String, default: null },
+    defaultSupplier: { type: String, default: null },
     errorMessage: { type: String, default: null },
     templateIdAtConversion: { type: Schema.Types.ObjectId, ref: 'CsvTemplate', default: null },
     validatedAt: { type: Date, default: null },

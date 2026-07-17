@@ -92,7 +92,6 @@ function cellString(value: unknown): string {
 export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
   const [columns, setColumns] = useState<string[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [templateName, setTemplateName] = useState<string | null>(null)
   const [noTemplate, setNoTemplate] = useState(false)
   const [mapping, setMapping] = useState<ColumnMapping>({ name: '', stock: '', salePrice: '', family: '', supplier: '' })
   const [globalSearch, setGlobalSearch] = useState('')
@@ -114,20 +113,17 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
     const all: Product[] = []
     let pageIndex = 1
     let cols: string[] = []
-    let name: string | null = null
     for (;;) {
       const res = await fetch(`/api/catalog/products?page=${pageIndex}&pageSize=500`)
       if (res.status === 404) { setNoTemplate(true); break }
       if (!res.ok) throw new Error('Chargement impossible.')
       const data = await res.json()
       cols = data.columns ?? cols
-      name = data.templateName ?? name
       all.push(...(data.products ?? []))
       if ((data.products ?? []).length < 500) break
       pageIndex += 1
     }
     setColumns(cols)
-    setTemplateName(name)
     setProducts(all)
     setMapping(detectColumnMapping(cols))
   }, [])
@@ -272,7 +268,6 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{activeDefinition.label}</h1>
-            <p className="mt-1 text-sm text-slate-600">Catalogue : <strong>{templateName ?? '—'}</strong>. {activeDefinition.description}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button

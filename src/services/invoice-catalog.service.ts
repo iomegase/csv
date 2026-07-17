@@ -185,6 +185,10 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     if (identityColumns.barcode && group.barcode) csvData[identityColumns.barcode] = group.barcode
     if (identityColumns.name && group.description) csvData[identityColumns.name] = group.description
 
+    // Famille et fournisseur saisis à l'import : une facture ne les porte pas.
+    if (invoice.defaultFamily) csvData[COL.famille] = invoice.defaultFamily
+    if (invoice.defaultSupplier) csvData[COL.fournisseur] = invoice.defaultSupplier
+
     // ShopCaisse ne connaît pas encore ce produit : Stock actuel = 0 (factuel, pas
     // inventé), Stock souhaité = quantité reçue, d'où un Mouvement = quantité.
     const movement = computeMovement('0', String(group.qty))

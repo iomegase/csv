@@ -23,10 +23,14 @@ export async function POST(request: Request) {
     }
 
     const { file } = parsed.data
+    const family = formData.get('family')
+    const supplier = formData.get('supplier')
     const result = await createInvoiceImport({
       buffer: Buffer.from(await file.arrayBuffer()),
       originalFileName: file.name,
       mimeType: file.type || 'application/octet-stream',
+      family: typeof family === 'string' ? family : null,
+      supplier: typeof supplier === 'string' ? supplier : null,
     })
 
     // Lance l'analyse dès l'import ; le client suivra le statut via GET.
