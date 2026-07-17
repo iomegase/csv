@@ -62,16 +62,15 @@ describe('rowMatchesProductView — prix et stock ≤ 0 comptent comme absents',
     expect(rowMatchesProductView(rowWith('5', '9'), 'withoutStock', mapping)).toBe(false)
   })
 
-  it('« stock, prix et fournisseur » exige aussi un fournisseur', () => {
-    // Stock + prix positifs ET un fournisseur renseigné.
+  it('« produits complets » exige stock, prix, fournisseur ET famille', () => {
+    // Les quatre présents : produit complet.
     expect(rowMatchesProductView(rowWith('5', '9'), 'withStockAndPrice', mapping)).toBe(true)
-    // Même stock et prix, mais sans fournisseur : exclu.
-    expect(
-      rowMatchesProductView(
-        { Nom: 'X', 'Stock actuel': '5', Prix: '9', Fournisseur: 'Pas de fournisseur' },
-        'withStockAndPrice',
-        mapping,
-      ),
-    ).toBe(false)
+
+    const base = { Nom: 'X', 'Stock actuel': '5', Prix: '9', Fournisseur: 'Moulin roty', Famille: 'Kids' }
+    // Retirer n'importe lequel des quatre critères exclut le produit.
+    expect(rowMatchesProductView({ ...base, 'Stock actuel': '0' }, 'withStockAndPrice', mapping)).toBe(false)
+    expect(rowMatchesProductView({ ...base, Prix: '0' }, 'withStockAndPrice', mapping)).toBe(false)
+    expect(rowMatchesProductView({ ...base, Fournisseur: 'Pas de fournisseur' }, 'withStockAndPrice', mapping)).toBe(false)
+    expect(rowMatchesProductView({ ...base, Famille: 'Pas de famille' }, 'withStockAndPrice', mapping)).toBe(false)
   })
 })

@@ -35,9 +35,10 @@ export const PRODUCT_VIEWS: ProductViewDefinition[] = [
   {
     id: 'withStockAndPrice',
     href: '/avec-stock-et-prix',
-    label: 'Produits avec stock, prix et fournisseur',
-    shortLabel: 'Stock + prix + fourn.',
-    description: 'Références possédant une quantité positive, un prix de vente positif et un fournisseur renseigné.',
+    label: 'Produits complets',
+    shortLabel: 'Complets',
+    description:
+      'Les produits enregistrés correctement : stock positif, prix de vente positif, fournisseur et famille renseignés.',
   },
   {
     id: 'withoutStock',
@@ -187,7 +188,7 @@ export function getRequiredMappingKeys(view: ProductViewId): Array<keyof ColumnM
     case 'withoutPrice':
       return ['salePrice']
     case 'withStockAndPrice':
-      return ['stock', 'salePrice', 'supplier']
+      return ['stock', 'salePrice', 'supplier', 'family']
     case 'withoutFamily':
       return ['family']
     case 'withoutSupplier':
@@ -223,7 +224,8 @@ export function rowMatchesProductView(
         stock > 0 &&
         salePrice !== null &&
         salePrice > 0 &&
-        !isWithoutSupplier(row[mapping.supplier])
+        !isWithoutSupplier(row[mapping.supplier]) &&
+        !isWithoutFamily(row[mapping.family])
       )
     case 'withoutFamily':
       return isWithoutFamily(row[mapping.family])
