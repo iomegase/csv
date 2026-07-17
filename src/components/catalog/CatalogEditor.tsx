@@ -375,8 +375,17 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             const isActive = activeView === view.id
             const available = isViewAvailable(view.id, mapping)
             const count = available ? getProductViewRows(rows, view.id, mapping).length : null
+            // La vue « stock, prix et fournisseur » — celle des produits prêts à vendre — est en vert.
+            const isReady = view.id === 'withStockAndPrice'
+            const cardClass = isActive
+              ? isReady
+                ? 'border-emerald-700 bg-emerald-700 text-white'
+                : 'border-slate-900 bg-slate-900 text-white'
+              : isReady
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 hover:border-emerald-500'
+                : 'border-slate-200 bg-white text-slate-900 hover:border-slate-400'
             return (
-              <Link key={view.id} href={view.href} className={`rounded-2xl border p-4 ${isActive ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-900 hover:border-slate-400'}`}>
+              <Link key={view.id} href={view.href} className={`rounded-2xl border p-4 ${cardClass}`}>
                 <div className="flex items-center justify-between"><span className="text-sm font-bold">{view.label}</span><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${isActive ? 'bg-white text-slate-900' : 'bg-slate-100 text-slate-700'}`}>{count ?? '—'}</span></div>
               </Link>
             )

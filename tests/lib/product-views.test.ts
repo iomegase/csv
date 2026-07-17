@@ -47,7 +47,7 @@ describe('rowMatchesProductView — sans fournisseur', () => {
 
 describe('rowMatchesProductView — prix et stock ≤ 0 comptent comme absents', () => {
   const mapping: ColumnMapping = { name: 'Nom', stock: 'Stock actuel', salePrice: 'Prix', family: 'Famille', supplier: 'Fournisseur' }
-  const rowWith = (stock: string, prix: string) => ({ Nom: 'X', 'Stock actuel': stock, Prix: prix, Famille: 'F' })
+  const rowWith = (stock: string, prix: string) => ({ Nom: 'X', 'Stock actuel': stock, Prix: prix, Famille: 'F', Fournisseur: 'Moulin roty' })
 
   it.each(['0', '-3', ''])('classe un prix « %s » en Sans prix', (prix) => {
     expect(rowMatchesProductView(rowWith('5', prix), 'withoutPrice', mapping)).toBe(true)
@@ -60,6 +60,18 @@ describe('rowMatchesProductView — prix et stock ≤ 0 comptent comme absents',
   it('un prix et un stock strictement positifs ne sont ni sans prix ni sans stock', () => {
     expect(rowMatchesProductView(rowWith('5', '9'), 'withoutPrice', mapping)).toBe(false)
     expect(rowMatchesProductView(rowWith('5', '9'), 'withoutStock', mapping)).toBe(false)
+  })
+
+  it('« stock, prix et fournisseur » exige aussi un fournisseur', () => {
+    // Stock + prix positifs ET un fournisseur renseigné.
     expect(rowMatchesProductView(rowWith('5', '9'), 'withStockAndPrice', mapping)).toBe(true)
+    // Même stock et prix, mais sans fournisseur : exclu.
+    expect(
+      rowMatchesProductView(
+        { Nom: 'X', 'Stock actuel': '5', Prix: '9', Fournisseur: 'Pas de fournisseur' },
+        'withStockAndPrice',
+        mapping,
+      ),
+    ).toBe(false)
   })
 })
