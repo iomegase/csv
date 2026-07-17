@@ -9,6 +9,7 @@ import { COL } from '@/lib/shopcaisse-columns'
 import { POST as importRoute } from '@/app/api/admin/shopcaisse/import/route'
 import { GET as exportRoute } from '@/app/api/admin/shopcaisse/export/route'
 import { GET as summaryRoute } from '@/app/api/admin/shopcaisse/export-summary/route'
+import { GET as diffRoute } from '@/app/api/admin/catalog/diff/route'
 
 withTestDatabase()
 
@@ -112,5 +113,31 @@ describe('GET /api/admin/shopcaisse/export', () => {
     const body = await response.json()
     expect(body.error).toBe('export_blocked')
     expect(body.validation.conflicts.length).toBeGreaterThan(0)
+  })
+})
+
+describe('GET /api/admin/catalog/diff', () => {
+  it('rend la validation d’export à côté du diff', async () => {
+    await post({ importId: await upload('export-produits.csv'), kind: 'products' })
+    const body = await (await diffRoute()).json()
+
+    expect(body.diff).toBeTruthy()
+    expect(body.validation.summary.alignment).toBe('Conforme')
+    expect(body.validation.summary.productRowCount).toBe(1)
+    expect(body.validation.summary.stockRowCount).toBe(1)
+  })
+
+  it('expose les doublons pour affichage dans la page Comparer', async () => {
+    await post({ importId: await upload('export-produits.csv'), kind: 'products' })
+    const product = await CatalogProduct.findOne({}).lean()
+    await CatalogProduct.create({
+      templateId: product!.templateId,
+      csvData: { ...(product!.csvData as Record<string, unknown>), [COL.nom]: 'Autre' },
+    })
+
+    const body = await (await diffRoute()).json()
+    expect(body.validation.conflicts.length).toBeGreaterThan(0)
+    expect(body.validation.conflicts[0]).toMatchObject({ rule: 'Référence', reference: 'REF-001' })
+    expect(body.validation.canExport).toBe(false)
   })
 })
