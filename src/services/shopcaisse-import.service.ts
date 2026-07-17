@@ -8,6 +8,7 @@ import {
   matchRow,
   type IdentityRule,
 } from '@/lib/shopcaisse-identity'
+import { readStockCell } from '@/lib/shopcaisse-stock'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import type { ParsedCsv } from '@/services/csv-parser.service'
 import {
@@ -165,6 +166,73 @@ function registerPassKeys(
     const bucket = insertedKeys.get(rule)!
     if (!bucket.has(key)) bucket.set(key, rowIndex)
   }
+}
+
+/**
+ * Range les quantités d'un fichier stock ShopCaisse dans `Stock actuel`.
+ *
+ * `Stock actuel` et non `Stock souhaité` : le fichier décrit l'état connu de la
+ * caisse, pas la cible voulue par l'utilisateur. L'écrire dans `Stock souhaité`
+ * réduirait tous les mouvements à zéro.
+ *
+ * Ce fichier ne crée jamais de produit : une ligne sans famille, sans prix et
+ * sans TVA ne décrit pas un article exportable.
+ */
+export async function importStockIntoMaster(parsed: ParsedCsv): Promise<ImportSummary> {
+  await connectToDatabase()
+  const templateId = await ensureMasterTemplate()
+
+  const summary: ImportSummary = { created: 0, updated: 0, ambiguous: [], errors: [] }
+
+  const existing = await loadExisting()
+  const index = buildIdentityIndex(existing.map((entry) => ({ row: entry.row, item: entry })))
+
+  const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
+
+  parsed.rows.forEach((source, rowIndex) => {
+    const incoming = toMasterRow(source)
+    const match = matchRow(index, incoming)
+
+    if (match.status === 'ambiguous') {
+      summary.ambiguous.push({ row: rowIndex, rule: match.rule })
+      return
+    }
+
+    if (match.status === 'new') {
+      summary.errors.push({
+        row: rowIndex,
+        message: `Produit introuvable dans le tableau maître : ${describeRow(incoming)}. Importez d’abord le fichier produits.`,
+      })
+      return
+    }
+
+    const quantity = readStockCell(source[COL.quantite])
+    if (quantity.kind === 'invalid') {
+      summary.errors.push({ row: rowIndex, message: `Quantité non numérique : « ${quantity.raw} ».` })
+      return
+    }
+
+    const row = withMovement({
+      ...match.item.row,
+      [COL.stockActuel]: quantity.kind === 'empty' ? null : String(quantity.value),
+    })
+
+    operations.push({
+      updateOne: {
+        filter: { _id: match.item._id },
+        update: { $set: { templateId: new Types.ObjectId(templateId), ...writeFields(row) } },
+      },
+    })
+    summary.updated += 1
+  })
+
+  await flush(operations)
+  return summary
+}
+
+/** De quoi que l'utilisateur reconnaisse la ligne fautive dans son fichier. */
+function describeRow(row: MasterRow): string {
+  return row[COL.identifiant] ?? row[COL.reference] ?? row[COL.nom] ?? '(ligne sans identifiant)'
 }
 
 /**
