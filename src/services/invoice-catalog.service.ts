@@ -33,6 +33,12 @@ interface NewGroup {
   reference: string | null
   barcode: string | null
   description: string | null
+  purchasePriceHT: number | null
+}
+
+interface MatchedAdd {
+  qty: number
+  purchasePriceHT: number | null
 }
 
 /**
@@ -92,7 +98,7 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
   const templateObjectId = template._id as Types.ObjectId
 
   // Première passe : résolution + agrégation par produit cible (R1.6).
-  const matchedAdds = new Map<string, number>()
+  const matchedAdds = new Map<string, MatchedAdd>()
   const newGroups = new Map<string, NewGroup>()
 
   invoice.items.forEach((item: InvoiceItem, rowIndex: number) => {
@@ -119,7 +125,12 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
 
     if (match.status === 'matched') {
       const key = String(match.id)
-      matchedAdds.set(key, (matchedAdds.get(key) ?? 0) + quantity)
+      const prev = matchedAdds.get(key)
+      matchedAdds.set(key, {
+        qty: (prev?.qty ?? 0) + quantity,
+        // La facture porte le prix d'achat du moment ; la dernière ligne chiffrée gagne.
+        purchasePriceHT: item.purchasePriceHT ?? prev?.purchasePriceHT ?? null,
+      })
       return
     }
 
@@ -129,20 +140,23 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     const nnm = normalizeMatchValue(item.description)
     const dedupeKey = nbc ? `b:${nbc}` : nref ? `r:${nref}` : nnm ? `n:${nnm}` : `i:${rowIndex}`
     const group = newGroups.get(dedupeKey)
-    if (group) group.qty += quantity
-    else
+    if (group) {
+      group.qty += quantity
+      if (item.purchasePriceHT != null) group.purchasePriceHT = item.purchasePriceHT
+    } else
       newGroups.set(dedupeKey, {
         qty: quantity,
         reference: item.supplierReference ?? null,
         barcode: item.barcode ?? null,
         description: item.description ?? null,
+        purchasePriceHT: item.purchasePriceHT ?? null,
       })
   })
 
   // Seconde passe : une écriture par produit distinct.
   const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
 
-  for (const [idStr, addQty] of matchedAdds) {
+  for (const [idStr, add] of matchedAdds) {
     const csv = byId.get(idStr)?.csvData ?? {}
 
     // La marchandise reçue augmente la CIBLE (Stock souhaité), pas le Stock actuel
@@ -150,26 +164,31 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     const souhaite = readStockCell(csv[COL.stockSouhaite])
     const actuel = readStockCell(csv[COL.stockActuel])
     const base = souhaite.kind === 'number' ? souhaite.value : actuel.kind === 'number' ? actuel.value : 0
-    const newSouhaite = String(base + addQty)
+    const newSouhaite = String(base + add.qty)
     const movement = computeMovement(csv[COL.stockActuel], newSouhaite)
     const movementValue = movement.kind === 'value' ? movement.text : null
+
+    // $setField (clé littérale) : un nom de colonne avec espace ou point ne doit
+    // pas être interprété comme un chemin pointé. On empile les champs à poser :
+    // Stock souhaité, Mouvement stock recalculé, puis Prix d'achat s'il est chiffré.
+    let csvExpr: Record<string, unknown> = {
+      $setField: {
+        field: COL.mouvementStock,
+        input: { $setField: { field: COL.stockSouhaite, input: '$csvData', value: newSouhaite } },
+        value: movementValue,
+      },
+    }
+    if (add.purchasePriceHT != null) {
+      csvExpr = { $setField: { field: COL.prixAchat, input: csvExpr, value: String(add.purchasePriceHT) } }
+    }
 
     operations.push({
       updateOne: {
         filter: { _id: new Types.ObjectId(idStr) },
         update: [
           {
-            // $setField (clé littérale) : un nom de colonne avec espace ou point ne
-            // doit pas être interprété comme un chemin pointé. On pose deux champs :
-            // Stock souhaité, puis Mouvement stock recalculé par-dessus.
             $set: {
-              csvData: {
-                $setField: {
-                  field: COL.mouvementStock,
-                  input: { $setField: { field: COL.stockSouhaite, input: '$csvData', value: newSouhaite } },
-                  value: movementValue,
-                },
-              },
+              csvData: csvExpr,
               lastUpdatedFromInvoiceId: new Types.ObjectId(invoiceId),
             },
           },
@@ -188,6 +207,9 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     // Famille et fournisseur saisis à l'import : une facture ne les porte pas.
     if (invoice.defaultFamily) csvData[COL.famille] = invoice.defaultFamily
     if (invoice.defaultSupplier) csvData[COL.fournisseur] = invoice.defaultSupplier
+
+    // Prix d'achat repris de la facture (HT).
+    if (group.purchasePriceHT != null) csvData[COL.prixAchat] = String(group.purchasePriceHT)
 
     // ShopCaisse ne connaît pas encore ce produit : Stock actuel = 0 (factuel, pas
     // inventé), Stock souhaité = quantité reçue, d'où un Mouvement = quantité.

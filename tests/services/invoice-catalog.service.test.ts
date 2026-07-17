@@ -107,6 +107,35 @@ describe('applyInvoiceToCatalog', () => {
     expect(product!.csvData).toMatchObject({ Nom: 'Bol', Famille: 'Vaisselle', Fournisseur: 'Moulin roty' })
   })
 
+  it('reprend le prix d’achat de la facture sur un produit créé', async () => {
+    await makeActiveTemplate()
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'NEW-P', description: 'Vase', quantity: 4, purchasePriceHT: 7.7 }),
+    ])
+
+    await applyInvoiceToCatalog(invoiceId)
+
+    const product = await CatalogProduct.findOne({ reference: 'NEW-P' }).lean()
+    expect(product!.csvData).toMatchObject({ "Prix d'achat": '7.7' })
+  })
+
+  it('met à jour le prix d’achat d’un produit apparié', async () => {
+    await makeActiveTemplate()
+    await seedProduct({
+      reference: 'UPD-P',
+      name: 'Bol',
+      csvData: { Nom: 'Bol', Référence: 'UPD-P', 'Stock actuel': '3', "Prix d'achat": '2.00' },
+    })
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'UPD-P', quantity: 2, purchasePriceHT: 3.5 }),
+    ])
+
+    await applyInvoiceToCatalog(invoiceId)
+
+    const product = await CatalogProduct.findOne({ reference: 'UPD-P' }).lean()
+    expect(product!.csvData).toMatchObject({ "Prix d'achat": '3.5', 'Stock souhaité': '5' })
+  })
+
   it('crée un produit exportable sans Référence — un Nom et une quantité suffisent', async () => {
     await makeActiveTemplate()
     const invoiceId = await makeInvoice([emptyItem({ description: 'Bol artisanal', quantity: 4 })])
