@@ -3,6 +3,7 @@ import { withTestDatabase } from '../helpers/db'
 import { CsvTemplate } from '@/models/CsvTemplate'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { getCatalogColumnKeys, listCatalogProducts } from '@/services/catalog-product.service'
+import { ensureMasterTemplate } from '@/services/shopcaisse-master.service'
 
 withTestDatabase()
 
@@ -33,11 +34,13 @@ describe('listCatalogProducts', () => {
     expect(result.page).toBe(2)
   })
 
-  it('exclut les produits supprimés', async () => {
-    await seed(3)
-    await CatalogProduct.updateOne({}, { $set: { isDeleted: true } })
+  it('conserve dans le tableau maître une ligne marquée supprimée', async () => {
+    const templateId = await ensureMasterTemplate()
+    await CatalogProduct.create({ templateId, csvData: { Nom: 'Vase' }, isDeleted: true })
 
-    expect((await listCatalogProducts({ page: 1, pageSize: 10 })).total).toBe(2)
+    const result = await listCatalogProducts({ page: 1, pageSize: 50 })
+    expect(result.total).toBe(1)
+    expect(result.products).toHaveLength(1)
   })
 })
 
