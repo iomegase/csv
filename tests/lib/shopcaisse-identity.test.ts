@@ -134,4 +134,36 @@ describe('findConflicts', () => {
   it('ne signale pas deux lignes dont l\'Identifiant est vide', () => {
     expect(findConflicts([row({ [COL.reference]: 'A' }), row({ [COL.reference]: 'B' })])).toEqual([])
   })
+
+  it('n\'oppose pas deux produits à Identifiants distincts qui partagent une Référence', () => {
+    // Cas réel : une référence fournisseur (168408) couvre deux déclinaisons,
+    // chacune avec son propre Identifiant ShopCaisse. Pas d'ambiguïté : ShopCaisse
+    // réimporte par Identifiant.
+    expect(
+      findConflicts([
+        row({ [COL.identifiant]: 'id-1', [COL.reference]: '168408', [COL.nom]: 'Porte encens Dorine' }),
+        row({ [COL.identifiant]: 'id-2', [COL.reference]: '168408', [COL.nom]: 'Porte encens Perrine' }),
+      ]),
+    ).toEqual([])
+  })
+
+  it('signale encore une Référence partagée si une ligne n\'a pas d\'Identifiant', () => {
+    const conflicts = findConflicts([
+      row({ [COL.identifiant]: 'id-1', [COL.reference]: '168408' }),
+      row({ [COL.reference]: '168408', [COL.nom]: 'Sans Identifiant' }),
+    ])
+    expect(conflicts.length).toBeGreaterThan(0)
+    expect(conflicts.every((c) => c.rule === 'Référence')).toBe(true)
+  })
+
+  it('garde strict le Nom + Code barre entre deux Identifiants distincts', () => {
+    // Le code-barres reste unique : deux produits de même nom et même code-barres
+    // restent un conflit, même avec des Identifiants distincts (contrairement à
+    // la Référence, qui est une clé fournisseur non unique).
+    const conflicts = findConflicts([
+      row({ [COL.identifiant]: 'id-1', [COL.nom]: 'Café', [COL.codeBarre]: '376' }),
+      row({ [COL.identifiant]: 'id-2', [COL.nom]: 'Café', [COL.codeBarre]: '376' }),
+    ])
+    expect(conflicts.map((c) => c.rule)).toEqual(['Nom + Code barre', 'Nom + Code barre'])
+  })
 })

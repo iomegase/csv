@@ -49,6 +49,10 @@ function realBarcode(row: MasterRow): string {
   return /[a-z0-9]/.test(barcode) ? barcode : ''
 }
 
+function hasIdentifiant(row: MasterRow): boolean {
+  return normalizeMatchValue(row[COL.identifiant]) !== ''
+}
+
 function nameBarcodeKey(row: MasterRow): string {
   const name = normalizeMatchValue(row[COL.nom])
   const barcode = realBarcode(row)
@@ -122,6 +126,15 @@ export function findConflicts(rows: MasterRow[]): Conflict[] {
 
     for (const [, indexes] of byKey) {
       if (indexes.length < 2) continue
+
+      // La Référence est une clé fournisseur non unique : une même référence
+      // couvre parfois plusieurs déclinaisons. Deux produits qui ont chacun leur
+      // Identifiant ShopCaisse ne sont pas ambigus (ShopCaisse réimporte par
+      // Identifiant), donc on ne bloque pas. On ne signale que si au moins une
+      // ligne du groupe n'a pas d'Identifiant : son identité repose alors sur la
+      // Référence, et le partage la rend indistinguable.
+      if (rule === 'Référence' && indexes.every((index) => hasIdentifiant(rows[index]))) continue
+
       for (const index of indexes) {
         conflicts.push({
           row: index,
