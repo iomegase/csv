@@ -522,7 +522,7 @@ import { describe, expect, it } from 'vitest'
 import { COL, makeEmptyMasterRow, type MasterRow } from '@/lib/shopcaisse-columns'
 import { buildIdentityIndex, findConflicts, identityKeys, matchRow } from '@/lib/shopcaisse-identity'
 
-function row(values: Partial<Record<string, string>>): MasterRow {
+function row(values: Record<string, string | null>): MasterRow {
   return { ...makeEmptyMasterRow(), ...values }
 }
 
@@ -1819,7 +1819,7 @@ import {
   serializeCsv,
 } from '@/services/shopcaisse-export.service'
 
-function entry(id: string, values: Partial<Record<string, string>>): MasterEntry {
+function entry(id: string, values: Record<string, string | null>): MasterEntry {
   return { id, row: { ...makeEmptyMasterRow(), [COL.supprime]: '0', ...values } }
 }
 
@@ -2185,12 +2185,12 @@ import { COL, makeEmptyMasterRow } from '@/lib/shopcaisse-columns'
 import type { MasterEntry } from '@/services/shopcaisse-master.service'
 import { validateMasterEntries } from '@/services/shopcaisse-validation.service'
 
-function entry(id: string, values: Partial<Record<string, string>>): MasterEntry {
+function entry(id: string, values: Record<string, string | null>): MasterEntry {
   return { id, row: { ...makeEmptyMasterRow(), [COL.supprime]: '0', ...values } }
 }
 
 /** Un produit existant complet : sert de ligne « saine » de référence. */
-function existing(id: string, values: Partial<Record<string, string>> = {}): MasterEntry {
+function existing(id: string, values: Record<string, string | null> = {}): MasterEntry {
   return entry(id, { [COL.identifiant]: id, [COL.reference]: `REF-${id}`, [COL.nom]: `Produit ${id}`, ...values })
 }
 
