@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { COL, makeEmptyMasterRow, type MasterRow } from '@/lib/shopcaisse-columns'
 import { buildIdentityIndex, findConflicts, identityKeys, matchRow } from '@/lib/shopcaisse-identity'
 
-function row(values: Partial<Record<string, string>>): MasterRow {
+function row(values: Record<string, string | null>): MasterRow {
   return { ...makeEmptyMasterRow(), ...values }
 }
 
