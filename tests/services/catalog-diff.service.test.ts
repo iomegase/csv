@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { Types } from 'mongoose'
 import { withTestDatabase } from '../helpers/db'
 import { CsvTemplate } from '@/models/CsvTemplate'
-import { CsvImport } from '@/models/CsvImport'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { diffCatalogAgainstSource } from '@/services/catalog-diff.service'
 
@@ -9,35 +9,25 @@ withTestDatabase()
 
 const COLUMNS = ['Nom', 'Quantité']
 
-async function setup(originalRows: string[][], apply: (templateId: string) => Promise<void>) {
-  const header = COLUMNS.join(';')
-  const body = originalRows.map((r) => r.join(';')).join('\r\n')
-  const csv = `${header}\r\n${body}\r\n`
-  const csvImport = await CsvImport.create({
-    originalFileName: 't.csv',
-    rawContent: Buffer.from(csv, 'utf-8'),
-    fileSize: csv.length,
-    mimeType: 'text/csv',
-    encoding: 'utf-8',
-    delimiter: ';',
-    columns: COLUMNS,
-    rowCount: originalRows.length,
-  })
-  const template = await CsvTemplate.create({
+async function makeActiveTemplate() {
+  const t = await CsvTemplate.create({
     name: 'T',
     sourceFileName: 't.csv',
-    sourceImportId: csvImport._id,
     columns: COLUMNS.map((name, position) => ({ name, position, detectedType: 'string' })),
     delimiter: ';',
     isActive: true,
   })
-  await apply(String(template._id))
+  return String(t._id)
 }
 
 describe('diffCatalogAgainstSource', () => {
-  it('détecte une quantité modifiée (diff champ)', async () => {
-    await setup([['Vase', '10']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: '16' } })
+  it('détecte une cellule modifiée vs originalCsvData (diff champ)', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Vase',
+      csvData: { Nom: 'Vase', Quantité: '16' },
+      originalCsvData: { Nom: 'Vase', Quantité: '10' },
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.added).toHaveLength(0)
@@ -46,31 +36,58 @@ describe('diffCatalogAgainstSource', () => {
     expect(diff.modified[0].fields).toEqual([{ column: 'Quantité', from: '10', to: '16' }])
   })
 
-  it('détecte un article ajouté (absent de l’original)', async () => {
-    await setup([['Vase', '10']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: '10' } })
-      await CatalogProduct.create({ templateId, name: 'Bol', csvData: { Nom: 'Bol', Quantité: '4' } })
+  it('classe un produit créé par une facture en « ajouté »', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Bol',
+      csvData: { Nom: 'Bol', Quantité: '4' },
+      originalCsvData: { Nom: 'Bol', Quantité: '4' },
+      createdFromInvoiceId: new Types.ObjectId(),
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.added.map((a) => a.name)).toEqual(['Bol'])
-    expect(diff.removed).toHaveLength(0)
     expect(diff.modified).toHaveLength(0)
+    expect(diff.removed).toHaveLength(0)
   })
 
-  it('détecte un article supprimé (soft delete ⇒ retiré de la copie de travail)', async () => {
-    await setup([['Vase', '10']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: '10' }, isDeleted: true })
+  it('classe un produit créé à la main (sans originalCsvData) en « ajouté »', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Manuel',
+      csvData: { Nom: 'Manuel', Quantité: '1' },
+      originalCsvData: null,
+    })
+    const diff = await diffCatalogAgainstSource()
+    expect(diff.added.map((a) => a.name)).toEqual(['Manuel'])
+  })
+
+  it('classe un produit d’origine soft-deleted en « supprimé »', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Vase',
+      csvData: { Nom: 'Vase', Quantité: '10' },
+      originalCsvData: { Nom: 'Vase', Quantité: '10' },
+      isDeleted: true,
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.removed.map((r) => r.name)).toEqual(['Vase'])
+    expect(diff.removed[0].original).toMatchObject({ Nom: 'Vase', Quantité: '10' })
     expect(diff.added).toHaveLength(0)
     expect(diff.modified).toHaveLength(0)
   })
 
-  it('un article absent de l’original ET soft-deleted n’apparaît nulle part', async () => {
-    await setup([['Vase', '10']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: '10' } })
-      await CatalogProduct.create({ templateId, name: 'Bol', csvData: { Nom: 'Bol', Quantité: '4' }, isDeleted: true })
+  it('un article ajouté par facture puis supprimé s’annule (nulle part)', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Ephemere',
+      csvData: { Nom: 'Ephemere', Quantité: '2' },
+      originalCsvData: { Nom: 'Ephemere', Quantité: '2' },
+      createdFromInvoiceId: new Types.ObjectId(),
+      isDeleted: true,
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.added).toHaveLength(0)
@@ -79,22 +96,44 @@ describe('diffCatalogAgainstSource', () => {
   })
 
   it('ne signale pas une différence null vs chaîne vide', async () => {
-    await setup([['Vase', '']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: null } })
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Vase',
+      csvData: { Nom: 'Vase', Quantité: null },
+      originalCsvData: { Nom: 'Vase', Quantité: '' },
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.modified).toHaveLength(0)
   })
 
-  it('catalogue identique à l’original : aucun changement', async () => {
-    await setup([['Vase', '10'], ['Bol', '4']], async (templateId) => {
-      await CatalogProduct.create({ templateId, name: 'Vase', csvData: { Nom: 'Vase', Quantité: '10' } })
-      await CatalogProduct.create({ templateId, name: 'Bol', csvData: { Nom: 'Bol', Quantité: '4' } })
+  it('catalogue identique à l’origine : aucun changement', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Vase',
+      csvData: { Nom: 'Vase', Quantité: '10' },
+      originalCsvData: { Nom: 'Vase', Quantité: '10' },
     })
     const diff = await diffCatalogAgainstSource()
     expect(diff.added).toHaveLength(0)
     expect(diff.removed).toHaveLength(0)
     expect(diff.modified).toHaveLength(0)
+  })
+
+  it('un renommage apparaît en « modifié » (colonne Nom), pas en supprimé+ajouté', async () => {
+    const templateId = await makeActiveTemplate()
+    await CatalogProduct.create({
+      templateId,
+      name: 'Vase rouge',
+      csvData: { Nom: 'Vase rouge', Quantité: '10' },
+      originalCsvData: { Nom: 'Vase', Quantité: '10' },
+    })
+    const diff = await diffCatalogAgainstSource()
+    expect(diff.added).toHaveLength(0)
+    expect(diff.removed).toHaveLength(0)
+    expect(diff.modified).toHaveLength(1)
+    expect(diff.modified[0].fields).toEqual([{ column: 'Nom', from: 'Vase', to: 'Vase rouge' }])
   })
 
   it('sans template actif, lève une erreur', async () => {

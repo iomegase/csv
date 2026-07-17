@@ -30,10 +30,14 @@ ShopCaisse**.
 
 ## Décisions
 
-- **E1 — Original immuable.** À l'activation d'un import CSV, son contenu est figé
-  comme source de vérité (réutilise `CsvImport.rawContent`, déjà immuable). Au
-  niveau produit, `CatalogProduct.originalCsvData` (déjà présent, écrit à la
-  création) porte la valeur d'origine de chaque article.
+- **E1 — Original immuable, par produit (révisé R2).** La valeur d'origine de
+  chaque article est portée par `CatalogProduct.originalCsvData` (écrit à la
+  création, conservé). C'est le socle de comparaison : il **survit à la
+  suppression des imports CSV**. On n'utilise PAS `CsvImport.rawContent`
+  (l'import est destructible via le lot 3 — un `sourceImportId` orphelin rendait
+  la comparaison aveugle). Un article « ajouté » (absent de l'original) est
+  reconnu par sa provenance : `createdFromInvoiceId` non nul (facture) ou
+  `originalCsvData` absent (création manuelle).
 - **E2 — Copie de travail = catalogue.** `CatalogProduct.csvData` est la copie de
   travail éditable et persistante. Elle reçoit factures + éditions + ajouts +
   suppressions.
@@ -47,9 +51,12 @@ ShopCaisse**.
   écrase. Une action explicite « Réinitialiser depuis la source de vérité »
   (optionnelle, avec confirmation) permet de repartir de l'original — c'est le
   seul chemin destructif.
-- **E6 — Comparaison.** Un service diffe la copie de travail et l'original par
-  identité (Nom, cohérent R1) et renvoie : `ajoutés`, `supprimés`, `modifiés`
-  (diff champ par champ). Une page présente ce diff avant export.
+- **E6 — Comparaison (révisé R2).** Un service compare, produit par produit,
+  `csvData` (actuel) à `originalCsvData` (origine), et classe par provenance :
+  `modifiés` (cellules divergentes, diff champ par champ), `supprimés`
+  (`isDeleted` sur un produit d'origine), `ajoutés` (`createdFromInvoiceId` ou
+  `originalCsvData` absent). Un renommage apparaît donc en « modifié » (colonne
+  Nom). Une page présente ce diff avant export.
 - **E7 — Ne rien inventer** (hérité R1.3) : les valeurs sont rangées dans leurs
   colonnes ; les champs absents restent vides.
 - **E8 — Export inchangé.** Export ShopCaisse depuis la copie de travail
