@@ -6,6 +6,7 @@ import { Download, Filter, Package, Plus, RotateCcw, Search, Settings2, X } from
 import { COL } from '@/lib/shopcaisse-columns'
 import { computeMovement } from '@/lib/shopcaisse-stock'
 import { CsvFilter, CsvRow, FilterOperator, matchesFilter } from '@/lib/csv'
+import { PurgeDataButton } from '@/components/catalog/PurgeDataButton'
 import {
   ColumnMapping,
   detectColumnMapping,
@@ -243,14 +244,17 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{activeDefinition.label}</h1>
             <p className="mt-1 text-sm text-slate-600">Catalogue : <strong>{templateName ?? '—'}</strong>. {activeDefinition.description}</p>
           </div>
-          <button
-            type="button"
-            disabled={bundleBusy}
-            onClick={loadBundleSummary}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
-          >
-            <Download className="h-4 w-4" /> Exporter le lot ShopCaisse
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={bundleBusy}
+              onClick={loadBundleSummary}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" /> Exporter le lot ShopCaisse
+            </button>
+            <PurgeDataButton />
+          </div>
         </header>
 
         {error && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
