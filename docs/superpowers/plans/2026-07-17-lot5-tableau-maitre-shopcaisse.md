@@ -683,7 +683,7 @@ export interface Conflict {
  * Clé « Nom + Code barre ».
  *
  * Les deux valeurs sont exigées : un nom seul n'identifie pas un produit. Le
- * séparateur ` ` ne peut pas apparaître dans une valeur normalisée ; avec
+ * séparateur `\u0000` ne peut pas apparaître dans une valeur normalisée ; avec
  * un espace, « vase » + « 12 » et « vase 1 » + « 2 » donneraient la même clé et
  * fusionneraient deux produits distincts.
  */
@@ -691,7 +691,7 @@ function nameBarcodeKey(row: MasterRow): string {
   const name = normalizeMatchValue(row[COL.nom])
   const barcode = normalizeMatchValue(row[COL.codeBarre])
   if (!name || !barcode) return ''
-  return `${name} ${barcode}`
+  return `${name}\u0000${barcode}`
 }
 
 /** Les clés renseignées de la ligne, dans l'ordre de priorité de la consigne. */
