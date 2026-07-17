@@ -54,7 +54,7 @@ describe('POST /api/admin/shopcaisse/import', () => {
 
   it('importe ensuite le fichier stock dans Stock actuel', async () => {
     await post({ importId: await upload('export-produits.csv'), kind: 'products' })
-    const response = await post({ importId: await upload('export-stock-modele.csv'), kind: 'stock' })
+    const response = await post({ importId: await upload('visualisation-stocks.csv'), kind: 'stock' })
 
     expect(response.status).toBe(201)
     const product = await CatalogProduct.findOne({}).lean()

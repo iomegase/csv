@@ -1,6 +1,6 @@
 import { Types } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
-import { COL, MASTER_COLUMNS, type MasterRow } from '@/lib/shopcaisse-columns'
+import { COL, MASTER_COLUMNS, STOCK_VISUALISATION_QUANTITY, type MasterRow } from '@/lib/shopcaisse-columns'
 import {
   buildIdentityIndex,
   identityKeys,
@@ -207,7 +207,10 @@ export async function importStockIntoMaster(parsed: ParsedCsv): Promise<ImportSu
       return
     }
 
-    const quantity = readStockCell(source[COL.quantite])
+    // Le fichier d'entrée est l'export « Visualisation des stocks » de ShopCaisse :
+    // la quantité y est en « En stock », pas en « Quantité » (qui n'existe que
+    // dans notre export vers ShopCaisse).
+    const quantity = readStockCell(source[STOCK_VISUALISATION_QUANTITY])
     if (quantity.kind === 'invalid') {
       summary.errors.push({ row: rowIndex, message: `Quantité non numérique : « ${quantity.raw} ».` })
       return

@@ -101,6 +101,15 @@ export const STOCK_COLUMNS: readonly string[] = [
   COL.quantite,
 ]
 
+/**
+ * Colonne portant la quantité dans le fichier ShopCaisse « Visualisation des
+ * stocks » — l'export que ShopCaisse PRODUIT et que l'on réinjecte comme
+ * « Stock actuel ». À ne pas confondre avec `Quantité` de `STOCK_COLUMNS`, qui
+ * est le format que ShopCaisse ATTEND à l'import (donc notre export à nous).
+ * On lit le stock physique, pas `Stock effectif` (qui déduit les réservés).
+ */
+export const STOCK_VISUALISATION_QUANTITY = 'En stock'
+
 export type MasterRow = Record<string, string | null>
 
 /** Une ligne maître neuve : les 22 colonnes présentes, toutes vides (jamais 0). */
