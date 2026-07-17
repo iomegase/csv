@@ -406,6 +406,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             <table className="min-w-full border-collapse text-sm">
               <thead className="sticky top-0 z-10 bg-slate-900 text-left text-white">
                 <tr>
+                  <th className="sticky left-0 z-20 w-14 bg-slate-900 px-3 py-3 text-right font-semibold">#</th>
                   {columns.map((c) => <th key={c} className="min-w-48 whitespace-nowrap px-3 py-3 font-semibold">{c}</th>)}
                 </tr>
               </thead>
@@ -421,10 +422,18 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                     <tr
                       key={product.id}
                       title={issue?.reason}
-                      className={`border-b border-slate-200 hover:bg-slate-50 ${
+                      className={`group border-b border-slate-200 hover:bg-slate-50 ${
                         issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : ''
                       }`}
                     >
+                      {/* Position absolue dans le tableau maître : le même numéro que la page Comparer. */}
+                      <td
+                        className={`sticky left-0 z-10 w-14 px-3 py-1.5 text-right align-top text-xs font-semibold tabular-nums text-slate-500 ${
+                          issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : 'bg-white group-hover:bg-slate-50'
+                        }`}
+                      >
+                        {index + 1}
+                      </td>
                       {columns.map((column) => {
                         if (column === COL.supprime) {
                           const deleted = cellString(product.csvData[COL.supprime]) === '1'
