@@ -11,8 +11,8 @@ import {
   ColumnMapping,
   detectColumnMapping,
   getProductViewRows,
+  isEmptyValue,
   isViewAvailable,
-  isWithoutFamily,
   PRODUCT_VIEWS,
   ProductViewId,
 } from '@/lib/product-views'
@@ -30,6 +30,20 @@ const operators: Array<{ value: FilterOperator; label: string }> = [
 
 /** Renseignées par l'application : l'Identifiant vient de ShopCaisse, le mouvement est un calcul. */
 const READ_ONLY_COLUMNS: string[] = [COL.identifiant, COL.mouvementStock]
+
+/**
+ * Colonnes « à assigner » : quand la cellule vaut « Pas de … » (ou est vide), on
+ * remplace le champ libre par un select des valeurs déjà présentes, pour que
+ * l'admin en choisisse une d'un clic.
+ */
+const ASSIGNABLE_COLUMNS: Array<{ column: string; sentinel: string; placeholder: string }> = [
+  { column: COL.famille, sentinel: 'pas de famille', placeholder: 'Pas de famille' },
+  { column: COL.fournisseur, sentinel: 'pas de fournisseur', placeholder: 'Pas de fournisseur' },
+]
+
+function isUnassigned(value: string, sentinel: string): boolean {
+  return isEmptyValue(value) || value.trim().toLocaleLowerCase('fr') === sentinel
+}
 
 interface Product {
   id: string
@@ -130,15 +144,19 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
     [products, columns],
   )
 
-  // Les familles réellement présentes, pour peupler le select des cellules
-  // « Pas de famille ». Triées, sans doublon, sans les valeurs « sans famille ».
-  const availableFamilies = useMemo(() => {
-    const set = new Set<string>()
-    for (const product of products) {
-      const value = cellString(product.csvData[COL.famille]).trim()
-      if (value && !isWithoutFamily(value)) set.add(value)
+  // Valeurs déjà présentes pour chaque colonne « à assigner » (Famille, Fournisseur),
+  // pour peupler les selects des cellules « Pas de … ». Triées, sans doublon.
+  const assignableOptions = useMemo(() => {
+    const out: Record<string, string[]> = {}
+    for (const { column, sentinel } of ASSIGNABLE_COLUMNS) {
+      const set = new Set<string>()
+      for (const product of products) {
+        const value = cellString(product.csvData[column]).trim()
+        if (value && !isUnassigned(value, sentinel)) set.add(value)
+      }
+      out[column] = [...set].sort((a, b) => a.localeCompare(b, 'fr'))
     }
-    return [...set].sort((a, b) => a.localeCompare(b, 'fr'))
+    return out
   }, [products])
 
   const presetRows = useMemo(
@@ -467,9 +485,10 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                           )
                         }
 
-                        // Cellule Famille « Pas de famille » (ou vide) : un select des
-                        // familles existantes, pour que l'admin en assigne une d'un clic.
-                        if (column === COL.famille && isWithoutFamily(cellString(product.csvData[column]))) {
+                        // Cellule « à assigner » (Famille, Fournisseur) valant « Pas de … »
+                        // ou vide : un select des valeurs existantes, pour en choisir une.
+                        const assignable = ASSIGNABLE_COLUMNS.find((entry) => entry.column === column)
+                        if (assignable && isUnassigned(cellString(product.csvData[column]), assignable.sentinel)) {
                           return (
                             <td key={column} className="p-1.5 align-top">
                               <select
@@ -477,9 +496,9 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                                 onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
                                 className="min-w-44 w-full rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm outline-none focus:border-slate-600"
                               >
-                                <option value="">Pas de famille</option>
-                                {availableFamilies.map((family) => (
-                                  <option key={family} value={family}>{family}</option>
+                                <option value="">{assignable.placeholder}</option>
+                                {(assignableOptions[column] ?? []).map((value) => (
+                                  <option key={value} value={value}>{value}</option>
                                 ))}
                               </select>
                             </td>
