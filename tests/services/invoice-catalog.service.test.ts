@@ -4,10 +4,15 @@ import { CsvTemplate } from '@/models/CsvTemplate'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { InvoiceImport, type InvoiceItem } from '@/models/InvoiceImport'
 import { applyInvoiceToCatalog } from '@/services/invoice-catalog.service'
+import { validateMasterEntries } from '@/services/shopcaisse-validation.service'
+import type { MasterRow } from '@/lib/shopcaisse-columns'
 
 withTestDatabase()
 
-const COLUMNS = ['Nom', 'Référence', 'Code barre', 'Quantité']
+// Le template ne sert qu'à repérer les colonnes d'identité (Nom / Référence /
+// Code barre). La quantité reçue, elle, alimente toujours le Stock souhaité du
+// maître, quelle que soit la forme du template.
+const COLUMNS = ['Nom', 'Référence', 'Code barre']
 
 async function makeActiveTemplate() {
   await CsvTemplate.create({
@@ -43,14 +48,17 @@ async function makeInvoice(items: InvoiceItem[], over: Record<string, unknown> =
   return String(doc._id)
 }
 
+async function seedProduct(fields: Record<string, unknown>) {
+  await CatalogProduct.create({ templateId: (await CsvTemplate.findOne({}))!._id, ...fields })
+}
+
 describe('applyInvoiceToCatalog', () => {
-  it('ajoute la quantité au stock d’un produit apparié par référence', async () => {
+  it('porte la quantité reçue dans le Stock souhaité et recalcule le mouvement', async () => {
     await makeActiveTemplate()
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
+    await seedProduct({
       reference: 'VASE-001',
       name: 'Vase',
-      csvData: { Nom: 'Vase', Référence: 'VASE-001', Quantité: '10' },
+      csvData: { Nom: 'Vase', Référence: 'VASE-001', 'Stock actuel': '10' },
     })
     const invoiceId = await makeInvoice([
       emptyItem({ supplierReference: 'VASE-001', description: 'Vase', quantity: 6 }),
@@ -61,46 +69,12 @@ describe('applyInvoiceToCatalog', () => {
     expect(summary.updated).toBe(1)
     expect(summary.created).toBe(0)
     const product = await CatalogProduct.findOne({ reference: 'VASE-001' }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '16' })
+    // Cible 16 (10 connu + 6 reçus), mouvement 6 = ce que ShopCaisse doit ajouter.
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '16', 'Mouvement stock': '6' })
     expect(String(product!.lastUpdatedFromInvoiceId)).toBe(invoiceId)
   })
 
-  it('ajoute la quantité sur une colonne stock dont le nom contient un point, sans créer de sous-objet imbriqué', async () => {
-    // Régression : un $set d'agrégation avec une clé `csvData.${col}` en
-    // notation pointée scinderait "Qté." en ["csvData","Qté",""] et créerait
-    // un sous-objet au lieu d'écrire la vraie colonne. L'écriture doit passer
-    // par une clé littérale, symétrique de la lecture par $getField.
-    await CsvTemplate.create({
-      name: 'TDot',
-      sourceFileName: 't.csv',
-      columns: ['Nom', 'Référence', 'Qté.'].map((name, position) => ({
-        name,
-        position,
-        detectedType: 'string',
-      })),
-      delimiter: ';',
-      isActive: true,
-    })
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
-      reference: 'DOT-001',
-      name: 'Boîte',
-      csvData: { Nom: 'Boîte', Référence: 'DOT-001', 'Qté.': '10' },
-    })
-    const invoiceId = await makeInvoice([
-      emptyItem({ supplierReference: 'DOT-001', description: 'Boîte', quantity: 6 }),
-    ])
-
-    const summary = await applyInvoiceToCatalog(invoiceId)
-
-    expect(summary.updated).toBe(1)
-    const product = await CatalogProduct.findOne({ reference: 'DOT-001' }).lean()
-    expect(product!.csvData).toMatchObject({ 'Qté.': '16' })
-    expect(Object.prototype.hasOwnProperty.call(product!.csvData as object, 'Qté.')).toBe(true)
-    expect(Object.prototype.hasOwnProperty.call(product!.csvData as object, 'Qté')).toBe(false)
-  })
-
-  it('crée un produit inconnu avec le stock de la facture', async () => {
+  it('crée un produit inconnu : Stock actuel 0, Stock souhaité = quantité, mouvement = quantité', async () => {
     await makeActiveTemplate()
     const invoiceId = await makeInvoice([
       emptyItem({ supplierReference: 'NEW-1', description: 'Bol', quantity: 4 }),
@@ -110,17 +84,34 @@ describe('applyInvoiceToCatalog', () => {
 
     expect(summary.created).toBe(1)
     const product = await CatalogProduct.findOne({ reference: 'NEW-1' }).lean()
-    expect(product!.csvData).toMatchObject({ Référence: 'NEW-1', Nom: 'Bol', Quantité: '4' })
+    expect(product!.csvData).toMatchObject({
+      Référence: 'NEW-1',
+      Nom: 'Bol',
+      'Stock actuel': '0',
+      'Stock souhaité': '4',
+      'Mouvement stock': '4',
+    })
     expect(String(product!.createdFromInvoiceId)).toBe(invoiceId)
+  })
+
+  it('crée un produit exportable sans Référence — un Nom et une quantité suffisent', async () => {
+    await makeActiveTemplate()
+    const invoiceId = await makeInvoice([emptyItem({ description: 'Bol artisanal', quantity: 4 })])
+
+    await applyInvoiceToCatalog(invoiceId)
+
+    const product = await CatalogProduct.findOne({}).lean()
+    const validation = validateMasterEntries([{ id: 'x', row: product!.csvData as MasterRow }])
+    expect(validation.canExport).toBe(true)
+    expect(validation.blockers).toEqual([])
   })
 
   it('apparie par code-barres', async () => {
     await makeActiveTemplate()
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
+    await seedProduct({
       barcode: '3001234567890',
       name: 'Assiette',
-      csvData: { Nom: 'Assiette', 'Code barre': '3001234567890', Quantité: '2' },
+      csvData: { Nom: 'Assiette', 'Code barre': '3001234567890', 'Stock actuel': '2' },
     })
     const invoiceId = await makeInvoice([
       emptyItem({ barcode: '3001234567890', description: 'Assiette', quantity: 3 }),
@@ -130,15 +121,14 @@ describe('applyInvoiceToCatalog', () => {
 
     expect(summary.updated).toBe(1)
     const product = await CatalogProduct.findOne({ barcode: '3001234567890' }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '5' })
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '5', 'Mouvement stock': '3' })
   })
 
   it('apparie par nom quand référence et code-barres sont absents (R1.2)', async () => {
     await makeActiveTemplate()
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
+    await seedProduct({
       name: '[DP0001] Dessous de plat sapin blanc',
-      csvData: { Nom: '[DP0001] Dessous de plat sapin blanc', Quantité: '10' },
+      csvData: { Nom: '[DP0001] Dessous de plat sapin blanc', 'Stock actuel': '10' },
     })
     const invoiceId = await makeInvoice([
       emptyItem({ description: '[DP0001] Dessous de plat sapin blanc', quantity: 6 }),
@@ -151,34 +141,32 @@ describe('applyInvoiceToCatalog', () => {
     const product = await CatalogProduct.findOne({
       name: '[DP0001] Dessous de plat sapin blanc',
     }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '16' })
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '16', 'Mouvement stock': '6' })
     expect(String(product!.lastUpdatedFromInvoiceId)).toBe(invoiceId)
   })
 
-  it('lit un stock existant localisé (séparateur de milliers) sans le détruire (R1.7)', async () => {
+  it('base la cible sur un Stock souhaité déjà saisi plutôt que sur le Stock actuel', async () => {
     await makeActiveTemplate()
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
-      reference: 'LOC-1',
-      name: 'Carton',
-      csvData: { Nom: 'Carton', Référence: 'LOC-1', Quantité: '1 200' },
+    await seedProduct({
+      reference: 'TGT-1',
+      name: 'Coussin',
+      csvData: { Nom: 'Coussin', Référence: 'TGT-1', 'Stock actuel': '5', 'Stock souhaité': '8' },
     })
-    const invoiceId = await makeInvoice([emptyItem({ supplierReference: 'LOC-1', quantity: 6 })])
+    const invoiceId = await makeInvoice([emptyItem({ supplierReference: 'TGT-1', quantity: 2 })])
 
-    const summary = await applyInvoiceToCatalog(invoiceId)
+    await applyInvoiceToCatalog(invoiceId)
 
-    expect(summary.updated).toBe(1)
-    const product = await CatalogProduct.findOne({ reference: 'LOC-1' }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '1206' })
+    const product = await CatalogProduct.findOne({ reference: 'TGT-1' }).lean()
+    // 8 (cible déjà voulue) + 2 reçus = 10 ; mouvement 10 − 5 = 5.
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '10', 'Mouvement stock': '5' })
   })
 
   it('agrège plusieurs lignes visant le même produit existant (R1.6)', async () => {
     await makeActiveTemplate()
-    await CatalogProduct.create({
-      templateId: (await CsvTemplate.findOne({}))!._id,
+    await seedProduct({
       reference: 'SUM-1',
       name: 'Sac',
-      csvData: { Nom: 'Sac', Référence: 'SUM-1', Quantité: '10' },
+      csvData: { Nom: 'Sac', Référence: 'SUM-1', 'Stock actuel': '10' },
     })
     const invoiceId = await makeInvoice([
       emptyItem({ supplierReference: 'SUM-1', quantity: 6 }),
@@ -189,7 +177,7 @@ describe('applyInvoiceToCatalog', () => {
 
     expect(summary.updated).toBe(1)
     const product = await CatalogProduct.findOne({ reference: 'SUM-1' }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '20' })
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '20', 'Mouvement stock': '10' })
   })
 
   it('agrège plusieurs lignes d’un même nouveau produit (R1.6)', async () => {
@@ -204,14 +192,13 @@ describe('applyInvoiceToCatalog', () => {
     expect(summary.created).toBe(1)
     expect(await CatalogProduct.countDocuments({})).toBe(1)
     const product = await CatalogProduct.findOne({ reference: 'NEW-2' }).lean()
-    expect(product!.csvData).toMatchObject({ Quantité: '8' })
+    expect(product!.csvData).toMatchObject({ 'Stock souhaité': '8', 'Mouvement stock': '8' })
   })
 
   it('signale un nom ambigu (plusieurs produits de même nom) sans écrire (R1.5)', async () => {
     await makeActiveTemplate()
-    const templateId = (await CsvTemplate.findOne({}))!._id
-    await CatalogProduct.create({ templateId, name: 'Bougie', csvData: { Nom: 'Bougie', Quantité: '1' } })
-    await CatalogProduct.create({ templateId, name: 'Bougie', csvData: { Nom: 'Bougie', Quantité: '2' } })
+    await seedProduct({ name: 'Bougie', csvData: { Nom: 'Bougie' } })
+    await seedProduct({ name: 'Bougie', csvData: { Nom: 'Bougie' } })
     const invoiceId = await makeInvoice([emptyItem({ description: 'Bougie', quantity: 5 })])
 
     const summary = await applyInvoiceToCatalog(invoiceId)
@@ -224,9 +211,8 @@ describe('applyInvoiceToCatalog', () => {
 
   it('ne comptabilise pas un cas ambigu et le signale', async () => {
     await makeActiveTemplate()
-    const templateId = (await CsvTemplate.findOne({}))!._id
-    await CatalogProduct.create({ templateId, reference: 'DUP', name: 'A', csvData: { Référence: 'DUP', Quantité: '1' } })
-    await CatalogProduct.create({ templateId, reference: 'DUP', name: 'B', csvData: { Référence: 'DUP', Quantité: '1' } })
+    await seedProduct({ reference: 'DUP', name: 'A', csvData: { Référence: 'DUP' } })
+    await seedProduct({ reference: 'DUP', name: 'B', csvData: { Référence: 'DUP' } })
     const invoiceId = await makeInvoice([emptyItem({ supplierReference: 'DUP', quantity: 5 })])
 
     const summary = await applyInvoiceToCatalog(invoiceId)
@@ -268,18 +254,5 @@ describe('applyInvoiceToCatalog', () => {
     await expect(applyInvoiceToCatalog(invoiceId)).rejects.toThrow(/déjà appliquée/)
     // Pas de double ajout : une seule création.
     expect(await CatalogProduct.countDocuments({})).toBe(1)
-  })
-
-  it('échoue si le template actif n’a pas de colonne quantité', async () => {
-    await CsvTemplate.create({
-      name: 'SansQte',
-      sourceFileName: 't.csv',
-      columns: ['Nom', 'Référence'].map((name, position) => ({ name, position, detectedType: 'string' })),
-      delimiter: ';',
-      isActive: true,
-    })
-    const invoiceId = await makeInvoice([emptyItem({ supplierReference: 'X', quantity: 1 })])
-
-    await expect(applyInvoiceToCatalog(invoiceId)).rejects.toThrow(/colonne quantité|stock/)
   })
 })

@@ -3,8 +3,9 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { InvoiceImport } from '@/models/InvoiceImport'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { getActiveTemplate } from '@/services/csv-template.service'
-import { detectColumnMapping, parseLocalizedNumber } from '@/lib/product-views'
 import { detectIdentityMapping, normalizeMatchValue } from '@/lib/catalog-columns'
+import { COL } from '@/lib/shopcaisse-columns'
+import { computeMovement, readStockCell } from '@/lib/shopcaisse-stock'
 import type { InvoiceItem } from '@/models/InvoiceImport'
 
 // Ordre de priorité de l'appariement (R1.2) : code-barres → référence → nom.
@@ -64,10 +65,6 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
   const columnNames = [...template.columns]
     .sort((a, b) => a.position - b.position)
     .map((column) => column.name)
-  const stockColumn = detectColumnMapping(columnNames).stock
-  if (!stockColumn) {
-    throw new Error('Le template actif n’a pas de colonne quantité/stock reconnaissable.')
-  }
 
   const identityColumns = detectIdentityMapping(columnNames)
 
@@ -146,20 +143,33 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
   const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
 
   for (const [idStr, addQty] of matchedAdds) {
-    const product = byId.get(idStr)
-    const cell = product?.csvData?.[stockColumn]
-    const current = cell === undefined || cell === null ? 0 : (parseLocalizedNumber(String(cell)) ?? 0)
-    const newStock = current + addQty
+    const csv = byId.get(idStr)?.csvData ?? {}
+
+    // La marchandise reçue augmente la CIBLE (Stock souhaité), pas le Stock actuel
+    // (l'état connu de ShopCaisse). Le mouvement exporté vaut alors la quantité reçue.
+    const souhaite = readStockCell(csv[COL.stockSouhaite])
+    const actuel = readStockCell(csv[COL.stockActuel])
+    const base = souhaite.kind === 'number' ? souhaite.value : actuel.kind === 'number' ? actuel.value : 0
+    const newSouhaite = String(base + addQty)
+    const movement = computeMovement(csv[COL.stockActuel], newSouhaite)
+    const movementValue = movement.kind === 'value' ? movement.text : null
+
     operations.push({
       updateOne: {
         filter: { _id: new Types.ObjectId(idStr) },
         update: [
           {
+            // $setField (clé littérale) : un nom de colonne avec espace ou point ne
+            // doit pas être interprété comme un chemin pointé. On pose deux champs :
+            // Stock souhaité, puis Mouvement stock recalculé par-dessus.
             $set: {
-              // $setField (clé littérale) : un nom de colonne avec espace ou
-              // point (ex. « Gestion du stock », « Qté. ») ne doit pas être
-              // interprété comme un chemin pointé.
-              csvData: { $setField: { field: stockColumn, input: '$csvData', value: String(newStock) } },
+              csvData: {
+                $setField: {
+                  field: COL.mouvementStock,
+                  input: { $setField: { field: COL.stockSouhaite, input: '$csvData', value: newSouhaite } },
+                  value: movementValue,
+                },
+              },
               lastUpdatedFromInvoiceId: new Types.ObjectId(invoiceId),
             },
           },
@@ -174,7 +184,13 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
     if (identityColumns.reference && group.reference) csvData[identityColumns.reference] = group.reference
     if (identityColumns.barcode && group.barcode) csvData[identityColumns.barcode] = group.barcode
     if (identityColumns.name && group.description) csvData[identityColumns.name] = group.description
-    csvData[stockColumn] = String(group.qty)
+
+    // ShopCaisse ne connaît pas encore ce produit : Stock actuel = 0 (factuel, pas
+    // inventé), Stock souhaité = quantité reçue, d'où un Mouvement = quantité.
+    const movement = computeMovement('0', String(group.qty))
+    csvData[COL.stockActuel] = '0'
+    csvData[COL.stockSouhaite] = String(group.qty)
+    csvData[COL.mouvementStock] = movement.kind === 'value' ? movement.text : String(group.qty)
 
     operations.push({
       insertOne: {

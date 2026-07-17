@@ -106,7 +106,9 @@ describe('buildExportBundle', () => {
   })
 
   it('bloque l’export quand une donnée obligatoire manque', async () => {
-    await seed([{ [COL.nom]: 'Nouveau sans référence', [COL.stockSouhaite]: '2' }])
+    // Nouveau produit (ni Identifiant ni Référence) sans Stock souhaité : la
+    // Référence n'est plus exigée, mais un stock strictement positif l'est.
+    await seed([{ [COL.nom]: 'Nouveau sans stock' }])
     await expect(buildExportBundle()).rejects.toThrow(ExportBlockedError)
   })
 

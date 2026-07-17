@@ -138,14 +138,12 @@ function rowBlockers(entry: MasterEntry, index: number): RowIssue[] {
   }
 
   if (isNewProduct(row)) {
+    // La Référence n'est pas exigée : un produit reçu par facture n'a souvent
+    // qu'un Nom et une quantité. Le Nom l'identifie côté ShopCaisse.
     if (!String(row[COL.nom] ?? '').trim()) issues.push('Nom obligatoire pour un nouveau produit.')
-    if (!String(row[COL.reference] ?? '').trim()) {
-      issues.push('Référence obligatoire pour un nouveau produit.')
-    }
 
-    // §4 : un produit qui n'existe pas encore côté caisse n'a d'intérêt à
-    // l'import que s'il apporte du stock. Un mouvement nul ou négatif sur un
-    // produit inconnu de ShopCaisse ne veut rien dire.
+    // Un produit qui n'existe pas encore côté caisse n'a d'intérêt à l'import que
+    // s'il apporte du stock. La quantité vit dans le Stock souhaité (cible).
     const target = readStockCell(row[COL.stockSouhaite])
     if (target.kind !== 'number' || target.value <= 0) {
       issues.push('Stock souhaité obligatoire et strictement positif pour un nouveau produit.')

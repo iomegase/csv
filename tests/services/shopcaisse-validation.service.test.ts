@@ -61,10 +61,10 @@ describe('validateMasterEntries — nouveaux produits', () => {
     expect(result.summary.newWithoutId).toBe(1)
   })
 
-  it('bloque un nouveau produit sans Référence', () => {
+  it('autorise un nouveau produit sans Référence (Nom + Stock souhaité suffisent)', () => {
     const result = validateMasterEntries([entry('c', { [COL.nom]: 'Nouveau', [COL.stockSouhaite]: '3' })])
-    expect(result.canExport).toBe(false)
-    expect(result.blockers[0].reason).toBe('Référence obligatoire pour un nouveau produit.')
+    expect(result.canExport).toBe(true)
+    expect(result.blockers).toEqual([])
   })
 
   it('bloque un nouveau produit sans Nom', () => {
