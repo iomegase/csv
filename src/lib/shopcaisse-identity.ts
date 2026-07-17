@@ -35,9 +35,23 @@ export interface Conflict {
  * un espace, « vase » + « 12 » et « vase 1 » + « 2 » donneraient la même clé et
  * fusionneraient deux produits distincts.
  */
+/**
+ * Un code-barres qui n'identifie rien renvoie `''`.
+ *
+ * ShopCaisse écrit « [] » quand un produit n'a pas de code-barres — un tableau
+ * vide sérialisé, présent sur ~150 des ~2200 produits. Ce n'est pas une valeur :
+ * la lire comme telle ferait passer pour doublons tous les produits qui
+ * partagent un nom générique (« Recharge », « Torchon »…) sans code-barres.
+ * On exige donc au moins un caractère alphanumérique.
+ */
+function realBarcode(row: MasterRow): string {
+  const barcode = normalizeMatchValue(row[COL.codeBarre])
+  return /[a-z0-9]/.test(barcode) ? barcode : ''
+}
+
 function nameBarcodeKey(row: MasterRow): string {
   const name = normalizeMatchValue(row[COL.nom])
-  const barcode = normalizeMatchValue(row[COL.codeBarre])
+  const barcode = realBarcode(row)
   if (!name || !barcode) return ''
   return `${name}\u0000${barcode}`
 }

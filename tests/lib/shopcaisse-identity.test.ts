@@ -24,6 +24,11 @@ describe('identityKeys', () => {
     expect(keys).toEqual([])
   })
 
+  it('traite « [] » (marqueur ShopCaisse « pas de code-barres ») comme absent', () => {
+    const keys = identityKeys(row({ [COL.nom]: 'Recharge', [COL.codeBarre]: '[]' }))
+    expect(keys).toEqual([])
+  })
+
   it('normalise casse et accents', () => {
     const a = identityKeys(row({ [COL.reference]: '  Réf-001 ' }))
     const b = identityKeys(row({ [COL.reference]: 'ref-001' }))
@@ -113,6 +118,17 @@ describe('findConflicts', () => {
       row({ [COL.nom]: 'café', [COL.codeBarre]: '376' }),
     ])
     expect(conflicts.map((c) => c.rule)).toEqual(['Nom + Code barre', 'Nom + Code barre'])
+  })
+
+  it('ne signale pas deux produits de même nom sans code-barres (« [] »)', () => {
+    // Cas réel : 148 produits ShopCaisse portent « [] » (pas de code-barres).
+    // Deux « Recharge » sans code-barres sont des produits distincts, pas un doublon.
+    expect(
+      findConflicts([
+        row({ [COL.nom]: 'Recharge', [COL.codeBarre]: '[]' }),
+        row({ [COL.nom]: 'Recharge', [COL.codeBarre]: '[]' }),
+      ]),
+    ).toEqual([])
   })
 
   it('ne signale pas deux lignes dont l\'Identifiant est vide', () => {
