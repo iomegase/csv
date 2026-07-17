@@ -13,7 +13,8 @@ interface CsvImportRow {
 }
 
 export function CsvTemplateManager() {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const productsInputRef = useRef<HTMLInputElement>(null)
+  const stockInputRef = useRef<HTMLInputElement>(null)
   const [imports, setImports] = useState<CsvImportRow[]>([])
   const [activeName, setActiveName] = useState<string | null>(null)
   const [message, setMessage] = useState('')
@@ -38,7 +39,7 @@ export function CsvTemplateManager() {
     return () => window.clearTimeout(timer)
   }, [])
 
-  async function importCsv(file: File) {
+  async function importCsv(file: File, kind: 'products' | 'stock') {
     setBusy(true)
     setError('')
     setMessage('')
@@ -48,14 +49,19 @@ export function CsvTemplateManager() {
       const uploaded = await fetch('/api/csv-imports', { method: 'POST', body: formData }).then((r) => r.json())
       if (!uploaded.importId) throw new Error(uploaded.message ?? 'Import impossible.')
 
-      const activated = await fetch('/api/csv-templates/from-import', {
+      const result = await fetch('/api/admin/shopcaisse/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ importId: uploaded.importId }),
+        body: JSON.stringify({ importId: uploaded.importId, kind }),
       }).then((r) => r.json())
-      if (!activated.templateId) throw new Error(activated.message ?? 'Activation impossible.')
+      if (!result.summary) throw new Error(result.message ?? 'Import impossible.')
 
-      setMessage('Template CSV importé et activé.')
+      const { created, updated, ambiguous, errors } = result.summary
+      const parts = [`${created} créé(s)`, `${updated} mis à jour`]
+      if (ambiguous.length) parts.push(`${ambiguous.length} ligne(s) ambiguë(s), à résoudre dans « Comparer »`)
+      if (errors.length) parts.push(`${errors.length} ligne(s) en erreur : ${errors[0].message}`)
+      setMessage(`${kind === 'products' ? 'Produits' : 'Stock'} importé(s) — ${parts.join(', ')}.`)
+
       await refresh()
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : 'Import impossible.')
@@ -83,25 +89,51 @@ export function CsvTemplateManager() {
           <p className="mt-1 text-sm text-slate-600">
             Template actif : <strong>{activeName ?? 'aucun'}</strong>
           </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Importez d’abord <strong>export-produits.csv</strong>, puis le fichier stock : une quantité
+            ne peut être rattachée qu’à un produit déjà présent dans le tableau maître.
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-        >
-          <Upload className="h-4 w-4" />
-          Importer un CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => productsInputRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" />
+            Importer les produits
+          </button>
+          <button
+            type="button"
+            onClick={() => stockInputRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Upload className="h-4 w-4" />
+            Importer le stock
+          </button>
+        </div>
         <input
-          ref={inputRef}
+          ref={productsInputRef}
           type="file"
           accept=".csv"
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0]
             event.target.value = ''
-            if (file) importCsv(file)
+            if (file) importCsv(file, 'products')
+          }}
+        />
+        <input
+          ref={stockInputRef}
+          type="file"
+          accept=".csv"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file) importCsv(file, 'stock')
           }}
         />
       </div>
