@@ -1,0 +1,2 @@
+﻿Identifiant;Référence;Nom;Stock actuel;Stock souhaité;Mouvement stock;Famille;Rangs;Fournisseur;TVA sur place;TVA à emporter;Type;Code barre;Description;Unité;Prix d'achat;Gestion du stock;Affichage du stock;Couleur de fond;Texte du bouton;PRIX TTC - Défaut - Mon Magasin Caisse 1;Supprimé
+;REF-001;Café Latte;0;2.00;2.00;Boissons;Entrée;Fournisseur A;20.0;10.0;SIMPLE;3760001000001;Un café latte onctueux;UNIT;2.50;1;1;#190fa7;Dessert;;0
