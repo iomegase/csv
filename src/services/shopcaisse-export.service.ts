@@ -1,4 +1,4 @@
-import { COL, PRODUCT_COLUMNS, STOCK_COLUMNS, type MasterRow } from '@/lib/shopcaisse-columns'
+import { COL, PRODUCT_COLUMNS, type MasterRow } from '@/lib/shopcaisse-columns'
 import { serializeCsvValue } from '@/services/catalog-export.service'
 import { normalizeSupprime } from '@/services/shopcaisse-master.service'
 import type { MasterEntry } from '@/services/shopcaisse-master.service'
