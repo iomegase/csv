@@ -483,7 +483,7 @@ export function formatStockNumber(value: number): string {
 - [ ] **Step 4 : Vérifier que le test passe**
 
 Run: `npx vitest run tests/lib/shopcaisse-stock.test.ts`
-Expected: PASS (17 tests).
+Expected: PASS (15 tests).
 
 - [ ] **Step 5 : Commit**
 
