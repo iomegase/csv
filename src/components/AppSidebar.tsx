@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileSpreadsheet, FileText, Home, Package } from 'lucide-react'
+import { FileSpreadsheet, FileText, GitCompare, Home, Package } from 'lucide-react'
 
 const ITEMS = [
   { href: '/tous-les-produits', label: 'Accueil', icon: Home },
   { href: '/admin/invoices', label: 'Factures', icon: FileText },
   { href: '/catalogue', label: 'Stock', icon: Package },
+  { href: '/admin/catalog/diff', label: 'Comparer', icon: GitCompare },
   { href: '/admin/csv-template', label: 'Import CSV', icon: FileSpreadsheet },
 ]
 
