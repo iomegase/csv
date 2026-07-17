@@ -68,9 +68,19 @@ describe('validateMasterEntries — nouveaux produits', () => {
   })
 
   it('bloque un nouveau produit sans Nom', () => {
-    const result = validateMasterEntries([entry('c', { [COL.reference]: 'REF-N', [COL.stockSouhaite]: '3' })])
+    // Réellement nouveau : ni Identifiant ni Référence. Avec une Référence, il
+    // serait « existant » et n'aurait plus rien d'obligatoire.
+    const result = validateMasterEntries([entry('c', { [COL.stockSouhaite]: '3' })])
     expect(result.canExport).toBe(false)
     expect(result.blockers.map((b) => b.reason)).toContain('Nom obligatoire pour un nouveau produit.')
+  })
+
+  it('traite comme existant un produit sans Identifiant mais avec Référence', () => {
+    // Cas de export-produits.csv : Identifiant vide, Référence présente. Aucun
+    // stock souhaité exigé — la ligne s'exporte telle quelle.
+    const result = validateMasterEntries([entry('c', { [COL.reference]: 'REF-001', [COL.nom]: 'Café Latte' })])
+    expect(result.canExport).toBe(true)
+    expect(result.summary.newWithoutId).toBe(1)
   })
 
   it('bloque un nouveau produit dont la Référence est déjà prise', () => {
@@ -80,21 +90,29 @@ describe('validateMasterEntries — nouveaux produits', () => {
   })
 
   it('bloque un nouveau produit dont le Stock souhaité est vide', () => {
-    const result = validateMasterEntries([entry('c', { [COL.reference]: 'REF-N', [COL.nom]: 'Nouveau' })])
+    // Réellement nouveau (ni Id ni Réf) et sans stock : bloqué au moins sur le
+    // stock souhaité (la Référence manquante le bloque aussi, par construction).
+    const result = validateMasterEntries([entry('c', { [COL.nom]: 'Nouveau' })])
     expect(result.canExport).toBe(false)
-    expect(result.blockers[0].reason).toBe('Stock souhaité obligatoire et strictement positif pour un nouveau produit.')
+    expect(result.blockers.map((b) => b.reason)).toContain(
+      'Stock souhaité obligatoire et strictement positif pour un nouveau produit.',
+    )
   })
 
   it('bloque un nouveau produit dont le Stock souhaité est nul', () => {
-    const result = validateMasterEntries([entry('c', { ...NEW_OK, [COL.stockSouhaite]: '0' })])
+    const result = validateMasterEntries([entry('c', { [COL.nom]: 'Nouveau', [COL.stockSouhaite]: '0' })])
     expect(result.canExport).toBe(false)
-    expect(result.blockers).toHaveLength(1)
+    expect(result.blockers.map((b) => b.reason)).toContain(
+      'Stock souhaité obligatoire et strictement positif pour un nouveau produit.',
+    )
   })
 
   it('bloque un nouveau produit dont le Stock souhaité est négatif', () => {
-    const result = validateMasterEntries([entry('c', { ...NEW_OK, [COL.stockSouhaite]: '-2' })])
+    const result = validateMasterEntries([entry('c', { [COL.nom]: 'Nouveau', [COL.stockSouhaite]: '-2' })])
     expect(result.canExport).toBe(false)
-    expect(result.blockers).toHaveLength(1)
+    expect(result.blockers.map((b) => b.reason)).toContain(
+      'Stock souhaité obligatoire et strictement positif pour un nouveau produit.',
+    )
   })
 
   it('n’impose pas de stock souhaité à un produit existant', () => {

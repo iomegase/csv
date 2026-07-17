@@ -97,7 +97,9 @@ function countRows(entries: MasterEntry[]) {
   }
 
   for (const { row } of entries) {
-    if (isNewProduct(row)) counts.newWithoutId += 1
+    // Le compteur reste sur l'axe « sans Identifiant » — c'est ce que son nom
+    // annonce — indépendamment du fait qu'un tel produit soit « nouveau » ou non.
+    if (isBlank(row[COL.identifiant])) counts.newWithoutId += 1
     else counts.existing += 1
     if (row[COL.supprime] === '1') counts.deleted += 1
 
@@ -111,12 +113,19 @@ function countRows(entries: MasterEntry[]) {
   return counts
 }
 
+function isBlank(value: unknown): boolean {
+  return !String(value ?? '').trim()
+}
+
 /**
- * Un produit sans Identifiant ShopCaisse n'existe pas encore côté caisse.
- * On ne lui en fabrique jamais un : l'Identifiant est délivré par ShopCaisse.
+ * Un produit est « nouveau » — inconnu de ShopCaisse — s'il n'a ni Identifiant
+ * ni Référence. Un export ShopCaisse porte presque toujours une Référence même
+ * quand l'Identifiant est vide (cf. export-produits.csv) : cette ligne-là est
+ * donc déjà connue, et n'a pas à fournir de stock souhaité pour s'exporter.
+ * Seul un produit sans aucune de ces deux clés doit être complété à la main.
  */
 function isNewProduct(row: MasterRow): boolean {
-  return !String(row[COL.identifiant] ?? '').trim()
+  return isBlank(row[COL.identifiant]) && isBlank(row[COL.reference])
 }
 
 function rowBlockers(entry: MasterEntry, index: number): RowIssue[] {
