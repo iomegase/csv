@@ -1,5 +1,5 @@
-import { CsvEditor } from '@/components/csv-editor'
+import { CatalogEditor } from '@/components/catalog/CatalogEditor'
 
 export default function WithoutFamilyPage() {
-  return <CsvEditor activeView="withoutFamily" />
+  return <CatalogEditor activeView="withoutFamily" />
 }

@@ -1,5 +1,5 @@
-import { CsvEditor } from '@/components/csv-editor'
+import { CatalogEditor } from '@/components/catalog/CatalogEditor'
 
 export default function WithoutPricePage() {
-  return <CsvEditor activeView="withoutPrice" />
+  return <CatalogEditor activeView="withoutPrice" />
 }

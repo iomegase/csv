@@ -1,5 +1,5 @@
-import { CsvEditor } from '@/components/csv-editor'
+import { CatalogEditor } from '@/components/catalog/CatalogEditor'
 
 export default function WithStockAndPricePage() {
-  return <CsvEditor activeView="withStockAndPrice" />
+  return <CatalogEditor activeView="withStockAndPrice" />
 }
