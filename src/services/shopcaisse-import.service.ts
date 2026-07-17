@@ -1,7 +1,13 @@
 import { Types } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
 import { COL, MASTER_COLUMNS, type MasterRow } from '@/lib/shopcaisse-columns'
-import { buildIdentityIndex, matchRow, type IdentityRule } from '@/lib/shopcaisse-identity'
+import {
+  buildIdentityIndex,
+  identityKeys,
+  IDENTITY_RULES,
+  matchRow,
+  type IdentityRule,
+} from '@/lib/shopcaisse-identity'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import type { ParsedCsv } from '@/services/csv-parser.service'
 import {
@@ -43,6 +49,16 @@ export async function importProductsIntoMaster(parsed: ParsedCsv): Promise<Impor
 
   const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
 
+  // L'index ci-dessus est un instantané du maître pris AVANT la boucle et
+  // jamais rafraîchi : deux lignes du fichier qui désignent le même produit
+  // (existant ou nouveau) y sont invisibles l'une à l'autre. On suit donc
+  // séparément, pendant cette passe, ce qui a déjà été touché ou inséré.
+  const updatedIds = new Set<string>()
+  const insertedKeys = new Map<IdentityRule, Map<string, number>>(
+    IDENTITY_RULES.map((rule) => [rule, new Map<string, number>()]),
+  )
+  const flaggedAsCollisionSource = new Set<number>()
+
   parsed.rows.forEach((source, rowIndex) => {
     try {
       const incoming = toMasterRow(source)
@@ -56,6 +72,17 @@ export async function importProductsIntoMaster(parsed: ParsedCsv): Promise<Impor
       }
 
       if (match.status === 'matched') {
+        const id = String(match.item._id)
+        if (updatedIds.has(id)) {
+          // Une ligne précédente de cette même passe a déjà mis à jour ce
+          // produit. Un second updateOne sur le même _id, appliqué en mode
+          // non ordonné, rendrait le résultat final dépendant de l'ordre
+          // d'exécution du driver Mongo : on n'écrit rien et on signale.
+          summary.ambiguous.push({ row: rowIndex, rule: match.rule })
+          return
+        }
+        updatedIds.add(id)
+
         const merged = mergeProductRow(match.item.row, incoming)
         operations.push({
           updateOne: {
@@ -67,6 +94,22 @@ export async function importProductsIntoMaster(parsed: ParsedCsv): Promise<Impor
         return
       }
 
+      // Ligne « nouvelle » au regard du maître : reste à vérifier qu'elle ne
+      // désigne pas le même produit qu'une ligne déjà insérée plus tôt dans
+      // cette passe (le maître, lui, ne changera qu'après la boucle).
+      const collision = findPassCollision(insertedKeys, incoming)
+      if (collision) {
+        if (!flaggedAsCollisionSource.has(collision.row)) {
+          summary.ambiguous.push({ row: collision.row, rule: collision.rule })
+          flaggedAsCollisionSource.add(collision.row)
+        }
+        summary.ambiguous.push({ row: rowIndex, rule: collision.rule })
+      }
+      registerPassKeys(insertedKeys, incoming, rowIndex)
+
+      // Décision du pilote pour ce lot : on ne perd aucune ligne du fichier,
+      // même signalée comme ambiguë — la tâche 8 bloquera l'export tant que
+      // l'ambiguïté n'est pas tranchée manuellement.
       const row = withMovement(incoming)
       operations.push({
         insertOne: {
@@ -89,6 +132,39 @@ export async function importProductsIntoMaster(parsed: ParsedCsv): Promise<Impor
 
   await flush(operations)
   return summary
+}
+
+/**
+ * Cherche, parmi les clés déjà insérées pendant CETTE passe, une collision
+ * avec `row`. Reprend l'ordre de priorité de `identityKeys` (Identifiant →
+ * Référence → Nom + Code barre) : la première clé en collision détermine la
+ * règle signalée, comme `matchRow` le fait déjà pour le maître.
+ */
+function findPassCollision(
+  insertedKeys: Map<IdentityRule, Map<string, number>>,
+  row: MasterRow,
+): { rule: IdentityRule; row: number } | null {
+  for (const { rule, key } of identityKeys(row)) {
+    const firstRow = insertedKeys.get(rule)!.get(key)
+    if (firstRow !== undefined) return { rule, row: firstRow }
+  }
+  return null
+}
+
+/**
+ * Enregistre les clés d'identité de `row` comme « déjà insérées » dans cette
+ * passe. La première ligne à poser une clé en reste propriétaire : les
+ * collisions suivantes pointent toutes vers elle, pas vers la dernière venue.
+ */
+function registerPassKeys(
+  insertedKeys: Map<IdentityRule, Map<string, number>>,
+  row: MasterRow,
+  rowIndex: number,
+): void {
+  for (const { rule, key } of identityKeys(row)) {
+    const bucket = insertedKeys.get(rule)!
+    if (!bucket.has(key)) bucket.set(key, rowIndex)
+  }
 }
 
 /**

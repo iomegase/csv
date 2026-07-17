@@ -180,6 +180,44 @@ describe('importProductsIntoMaster', () => {
     expect(summary.updated).toBe(0)
   })
 
+  it('signale deux lignes du fichier en collision, et conserve les deux', async () => {
+    const summary = await importProductsIntoMaster(
+      parsedProducts([
+        { Nom: 'Café', Référence: 'REF-001' },
+        { Nom: 'Thé', Référence: 'REF-001' },
+      ]),
+    )
+
+    // Rien n'est perdu : les deux produits du fichier entrent au maître...
+    expect(summary.created).toBe(2)
+    const rows = await masterRows()
+    expect(rows.map((r) => r[COL.nom])).toEqual(['Café', 'Thé'])
+    // ...mais les deux lignes sont signalées, pour que la tâche 8 bloque l'export.
+    expect(summary.ambiguous).toEqual([
+      { row: 0, rule: 'Référence' },
+      { row: 1, rule: 'Référence' },
+    ])
+  })
+
+  it('n’applique qu’une fois deux lignes du fichier visant le même produit existant', async () => {
+    await importProductsIntoMaster(parsedProducts([{ Identifiant: '42', Nom: 'Café', Référence: 'REF-001' }]))
+
+    const summary = await importProductsIntoMaster(
+      parsedProducts([
+        { Identifiant: '42', Nom: 'Café Latte', Référence: 'REF-001' },
+        { Identifiant: '42', Nom: 'Café Crème', Référence: 'REF-001' },
+      ]),
+    )
+
+    // Deux updateOne sur le même _id en mode non ordonné rendaient le nom final
+    // dépendant du driver. La première ligne gagne, la seconde est signalée.
+    expect(summary.updated).toBe(1)
+    expect(summary.ambiguous).toEqual([{ row: 1, rule: 'Identifiant' }])
+    const rows = await masterRows()
+    expect(rows).toHaveLength(1)
+    expect(rows[0][COL.nom]).toBe('Café Latte')
+  })
+
   it('convertit Oui en 1 dans la colonne Supprimé', async () => {
     await importProductsIntoMaster(parsedProducts([{ Nom: 'Café', Référence: 'REF-001', Supprimé: 'Oui' }]))
     const [row] = await masterRows()
