@@ -3,13 +3,12 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Papa from 'papaparse'
-import { Boxes, Download, Filter, Plus, RotateCcw, Search, Settings2, Trash2, X } from 'lucide-react'
+import { Download, Filter, Plus, RotateCcw, Search, Settings2, Trash2, X } from 'lucide-react'
 import { CsvFilter, CsvRow, FilterOperator, matchesFilter } from '@/lib/csv'
 import {
   ColumnMapping,
   detectColumnMapping,
   getProductViewRows,
-  getRequiredMappingKeys,
   isViewAvailable,
   PRODUCT_VIEWS,
   ProductViewId,
