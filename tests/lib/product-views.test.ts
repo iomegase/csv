@@ -16,10 +16,37 @@ describe('detectColumnMapping — colonnes du tableau maître ShopCaisse', () =>
   it('ne prend pas « Prix d’achat » pour le prix de vente', () => {
     expect(mapping.salePrice).not.toBe("Prix d'achat")
   })
+
+  it('reconnaît « Fournisseur » comme colonne fournisseur', () => {
+    expect(mapping.supplier).toBe('Fournisseur')
+  })
+})
+
+describe('rowMatchesProductView — sans fournisseur', () => {
+  const mapping: ColumnMapping = {
+    name: 'Nom',
+    stock: 'Stock actuel',
+    salePrice: 'Prix',
+    family: 'Famille',
+    supplier: 'Fournisseur',
+  }
+
+  it.each(['', 'Pas de fournisseur', 'PAS DE FOURNISSEUR'])(
+    'classe « %s » en Sans fournisseur',
+    (fournisseur) => {
+      expect(rowMatchesProductView({ Nom: 'X', Fournisseur: fournisseur }, 'withoutSupplier', mapping)).toBe(true)
+    },
+  )
+
+  it('ne classe pas un produit avec un vrai fournisseur en Sans fournisseur', () => {
+    expect(
+      rowMatchesProductView({ Nom: 'X', Fournisseur: 'Moulin roty' }, 'withoutSupplier', mapping),
+    ).toBe(false)
+  })
 })
 
 describe('rowMatchesProductView — prix et stock ≤ 0 comptent comme absents', () => {
-  const mapping: ColumnMapping = { name: 'Nom', stock: 'Stock actuel', salePrice: 'Prix', family: 'Famille' }
+  const mapping: ColumnMapping = { name: 'Nom', stock: 'Stock actuel', salePrice: 'Prix', family: 'Famille', supplier: 'Fournisseur' }
   const rowWith = (stock: string, prix: string) => ({ Nom: 'X', 'Stock actuel': stock, Prix: prix, Famille: 'F' })
 
   it.each(['0', '-3', ''])('classe un prix « %s » en Sans prix', (prix) => {

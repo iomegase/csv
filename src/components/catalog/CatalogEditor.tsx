@@ -94,7 +94,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
   const [products, setProducts] = useState<Product[]>([])
   const [templateName, setTemplateName] = useState<string | null>(null)
   const [noTemplate, setNoTemplate] = useState(false)
-  const [mapping, setMapping] = useState<ColumnMapping>({ name: '', stock: '', salePrice: '', family: '' })
+  const [mapping, setMapping] = useState<ColumnMapping>({ name: '', stock: '', salePrice: '', family: '', supplier: '' })
   const [globalSearch, setGlobalSearch] = useState('')
   const [filters, setFilters] = useState<CsvFilter[]>([])
   const [page, setPage] = useState(1)
@@ -370,7 +370,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
           </section>
         )}
 
-        <nav className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Vues produits">
+        <nav className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Vues produits">
           {PRODUCT_VIEWS.map((view) => {
             const isActive = activeView === view.id
             const available = isViewAvailable(view.id, mapping)
@@ -399,9 +399,9 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
 
           {showMapping && (
             <div className="mt-4 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-2 xl:grid-cols-4">
-              {(['name', 'stock', 'salePrice', 'family'] as Array<keyof ColumnMapping>).map((key) => (
+              {(['name', 'stock', 'salePrice', 'family', 'supplier'] as Array<keyof ColumnMapping>).map((key) => (
                 <label key={key} className="space-y-1.5 text-sm font-semibold text-slate-700">
-                  <span>{{ name: 'Nom', stock: 'Quantité / stock', salePrice: 'Prix de vente', family: 'Famille' }[key]}</span>
+                  <span>{{ name: 'Nom', stock: 'Quantité / stock', salePrice: 'Prix de vente', family: 'Famille', supplier: 'Fournisseur' }[key]}</span>
                   <select value={mapping[key]} onChange={(e) => { setMapping((c) => ({ ...c, [key]: e.target.value })); setPage(1) }} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal">
                     <option value="">Non définie</option>
                     {columns.map((c) => <option key={c} value={c}>{c}</option>)}

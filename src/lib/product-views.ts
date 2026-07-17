@@ -6,12 +6,14 @@ export type ProductViewId =
   | 'withoutPrice'
   | 'withStockAndPrice'
   | 'withoutFamily'
+  | 'withoutSupplier'
 
 export interface ColumnMapping {
   name: string
   stock: string
   salePrice: string
   family: string
+  supplier: string
 }
 
 export interface ProductViewDefinition {
@@ -58,6 +60,13 @@ export const PRODUCT_VIEWS: ProductViewDefinition[] = [
     shortLabel: 'Sans famille',
     description: 'Références dont la famille ou la catégorie n’est pas renseignée.',
   },
+  {
+    id: 'withoutSupplier',
+    href: '/sans-fournisseur',
+    label: 'Produits sans fournisseur',
+    shortLabel: 'Sans fournisseur',
+    description: 'Références dont le fournisseur n’est pas renseigné.',
+  },
 ]
 
 const COLUMN_ALIASES: Record<keyof ColumnMapping, string[]> = {
@@ -75,6 +84,7 @@ const COLUMN_ALIASES: Record<keyof ColumnMapping, string[]> = {
     'pv',
   ],
   family: ['famille', 'categorie', 'rayon', 'univers', 'groupe', 'collection'],
+  supplier: ['fournisseur', 'supplier', 'vendor', 'fabricant'],
 }
 
 export function normalizeHeader(value: string): string {
@@ -112,6 +122,7 @@ export function detectColumnMapping(columns: string[]): ColumnMapping {
     stock: findColumn(columns, COLUMN_ALIASES.stock),
     salePrice: findColumn(columns, COLUMN_ALIASES.salePrice),
     family: findColumn(columns, COLUMN_ALIASES.family),
+    supplier: findColumn(columns, COLUMN_ALIASES.supplier),
   }
 }
 
@@ -151,6 +162,7 @@ export function isEmptyValue(value: string): boolean {
 }
 
 const NO_FAMILY_LABELS = ['pas de famille']
+const NO_SUPPLIER_LABELS = ['pas de fournisseur']
 
 export function isWithoutFamily(value: string): boolean {
   const normalized = String(value ?? '')
@@ -158,6 +170,14 @@ export function isWithoutFamily(value: string): boolean {
     .toLocaleLowerCase('fr')
 
   return isEmptyValue(normalized) || NO_FAMILY_LABELS.includes(normalized)
+}
+
+export function isWithoutSupplier(value: string): boolean {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLocaleLowerCase('fr')
+
+  return isEmptyValue(normalized) || NO_SUPPLIER_LABELS.includes(normalized)
 }
 
 export function getRequiredMappingKeys(view: ProductViewId): Array<keyof ColumnMapping> {
@@ -170,6 +190,8 @@ export function getRequiredMappingKeys(view: ProductViewId): Array<keyof ColumnM
       return ['stock', 'salePrice']
     case 'withoutFamily':
       return ['family']
+    case 'withoutSupplier':
+      return ['supplier']
     default:
       return []
   }
@@ -199,6 +221,8 @@ export function rowMatchesProductView(
       return stock !== null && stock > 0 && salePrice !== null && salePrice > 0
     case 'withoutFamily':
       return isWithoutFamily(row[mapping.family])
+    case 'withoutSupplier':
+      return isWithoutSupplier(row[mapping.supplier])
     default:
       return true
   }
