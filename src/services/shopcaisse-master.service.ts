@@ -1,7 +1,7 @@
 import { Types } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
 import { normalizeHeader } from '@/lib/product-views'
-import { COL, MASTER_COLUMNS, makeEmptyMasterRow, type MasterRow } from '@/lib/shopcaisse-columns'
+import { COL, MASTER_COLUMNS, isMasterColumn, makeEmptyMasterRow, type MasterRow } from '@/lib/shopcaisse-columns'
 import { computeMovement } from '@/lib/shopcaisse-stock'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { CsvTemplate } from '@/models/CsvTemplate'
@@ -46,7 +46,7 @@ export function toMasterRow(source: Record<string, unknown>): MasterRow {
   const row = makeEmptyMasterRow()
 
   for (const [key, value] of Object.entries(source)) {
-    const column = MASTER_COLUMNS.includes(key) ? key : MASTER_BY_NORMALIZED.get(normalizeHeader(key))
+    const column = isMasterColumn(key) ? key : MASTER_BY_NORMALIZED.get(normalizeHeader(key))
     if (!column) continue
     row[column] = emptyToNull(value)
   }
@@ -135,7 +135,7 @@ async function migrateCatalogToMaster(templateId: string): Promise<void> {
           $set: {
             templateId: new Types.ObjectId(templateId),
             csvData: row,
-            originalCsvData: original ? toMasterRow(original) : null,
+            originalCsvData: original ? withMovement(toMasterRow(original)) : null,
             isDeleted: row[COL.supprime] === '1',
           },
         },

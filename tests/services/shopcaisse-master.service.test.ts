@@ -149,6 +149,45 @@ describe('ensureMasterTemplate', () => {
     expect((product!.csvData as Record<string, unknown>)[COL.supprime]).toBe('1')
     expect(product!.isDeleted).toBe(true)
   })
+
+  it('calcule le mouvement dans l’original comme dans la copie de travail', async () => {
+    const old = await CsvTemplate.create({
+      name: 'Ancien',
+      sourceFileName: 'a.csv',
+      columns: [{ name: 'Nom', position: 0, detectedType: 'string' }],
+      isActive: true,
+    })
+    // Un catalogue déjà au format maître, importé par l'ancien chemin générique :
+    // les deux stocks sont là, le mouvement dérivé n'y est pas.
+    const stocks = { Nom: 'Vase', 'Stock actuel': '5', 'Stock souhaité': '8' }
+    await CatalogProduct.create({ templateId: old._id, name: 'Vase', csvData: stocks, originalCsvData: stocks })
+
+    await ensureMasterTemplate()
+
+    const product = await CatalogProduct.findOne({ name: 'Vase' }).lean()
+    const csvData = product!.csvData as Record<string, unknown>
+    const original = product!.originalCsvData as Record<string, unknown>
+    expect(csvData[COL.mouvementStock]).toBe('3')
+    // Sans cette symétrie, la page Comparer classerait le produit « modifié »
+    // alors que rien n'a changé.
+    expect(original[COL.mouvementStock]).toBe('3')
+  })
+
+  it('laisse originalCsvData à null pour un article sans original', async () => {
+    const old = await CsvTemplate.create({
+      name: 'Ancien',
+      sourceFileName: 'a.csv',
+      columns: [{ name: 'Nom', position: 0, detectedType: 'string' }],
+      isActive: true,
+    })
+    // « Pas d'original » a un sens métier : la page Comparer classe l'article « ajouté ».
+    await CatalogProduct.create({ templateId: old._id, name: 'Manuel', csvData: { Nom: 'Manuel' }, originalCsvData: null })
+
+    await ensureMasterTemplate()
+
+    const product = await CatalogProduct.findOne({ name: 'Manuel' }).lean()
+    expect(product!.originalCsvData).toBeNull()
+  })
 })
 
 describe('listMasterEntries', () => {
