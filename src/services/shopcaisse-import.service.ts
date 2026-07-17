@@ -10,7 +10,8 @@ import {
 } from '@/lib/shopcaisse-identity'
 import { readStockCell } from '@/lib/shopcaisse-stock'
 import { CatalogProduct } from '@/models/CatalogProduct'
-import type { ParsedCsv } from '@/services/csv-parser.service'
+import { CsvImport } from '@/models/CsvImport'
+import { parseCsvBuffer, type ParsedCsv } from '@/services/csv-parser.service'
 import {
   ensureMasterTemplate,
   toMasterRow,
@@ -282,4 +283,25 @@ async function flush(operations: Parameters<typeof CatalogProduct.bulkWrite>[0])
   for (let index = 0; index < operations.length; index += BATCH_SIZE) {
     await CatalogProduct.bulkWrite(operations.slice(index, index + BATCH_SIZE), { ordered: false })
   }
+}
+
+/**
+ * Rejoue les octets d'origine d'un import déjà stocké.
+ *
+ * Relire depuis la base plutôt que de reparser côté route : c'est la seule
+ * façon de retrouver l'encodage exact et les valeurs telles qu'elles étaient
+ * dans le fichier, exactement comme le fait `createTemplateFromImport`.
+ */
+export async function importCsvIntoMaster(
+  importId: string,
+  kind: 'products' | 'stock',
+): Promise<ImportSummary> {
+  await connectToDatabase()
+
+  const csvImport = await CsvImport.findById(importId)
+  if (!csvImport) throw new Error('Import CSV introuvable.')
+
+  const parsed = parseCsvBuffer(Buffer.from(csvImport.rawContent))
+
+  return kind === 'products' ? importProductsIntoMaster(parsed) : importStockIntoMaster(parsed)
 }
