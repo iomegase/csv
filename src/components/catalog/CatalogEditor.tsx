@@ -432,12 +432,14 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
         </section>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-auto">
-            <table className="min-w-full border-collapse text-sm">
+          {/* Hauteur bornée : c'est ce qui rend le défilement interne au tableau et
+              donc le thead sticky réellement collant. */}
+          <div className="max-h-[calc(100vh-15rem)] overflow-auto">
+            <table className="w-max border-collapse text-[11px]">
               <thead className="sticky top-0 z-10 bg-slate-900 text-left text-white">
                 <tr>
-                  <th className="sticky left-0 z-20 w-14 bg-slate-900 px-3 py-3 text-right font-semibold">#</th>
-                  {columns.map((c) => <th key={c} className="min-w-48 whitespace-nowrap px-3 py-3 font-semibold">{c}</th>)}
+                  <th className="sticky left-0 z-20 w-10 bg-slate-900 px-2 py-1.5 text-right font-semibold">#</th>
+                  {columns.map((c) => <th key={c} className="whitespace-nowrap px-2 py-1.5 font-semibold">{c}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -458,7 +460,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                     >
                       {/* Position absolue dans le tableau maître : le même numéro que la page Comparer. */}
                       <td
-                        className={`sticky left-0 z-10 w-14 px-3 py-1.5 text-right align-top text-xs font-semibold tabular-nums text-slate-500 ${
+                        className={`sticky left-0 z-10 w-10 px-2 py-1 text-right align-top text-[11px] font-semibold tabular-nums text-slate-500 ${
                           issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : 'bg-white group-hover:bg-slate-50'
                         }`}
                       >
@@ -468,12 +470,12 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         if (column === COL.supprime) {
                           const deleted = cellString(product.csvData[COL.supprime]) === '1'
                           return (
-                            <td key={column} className="p-1.5 align-top">
+                            <td key={column} className="p-0.5 align-top">
                               <button
                                 type="button"
                                 onClick={() => toggleSupprime(product)}
                                 title="Marquer comme supprimé dans ShopCaisse"
-                                className={`min-w-20 rounded-lg px-3 py-1.5 text-sm font-semibold ${
+                                className={`rounded px-2 py-0.5 text-[11px] font-semibold ${
                                   deleted
                                     ? 'bg-red-100 text-red-800 hover:bg-red-200'
                                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -490,11 +492,11 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         const assignable = ASSIGNABLE_COLUMNS.find((entry) => entry.column === column)
                         if (assignable && isUnassigned(cellString(product.csvData[column]), assignable.sentinel)) {
                           return (
-                            <td key={column} className="p-1.5 align-top">
+                            <td key={column} className="p-0.5 align-top">
                               <select
                                 defaultValue=""
                                 onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
-                                className="min-w-44 w-full rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm outline-none focus:border-slate-600"
+                                className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[11px] outline-none focus:border-slate-600"
                               >
                                 <option value="">{assignable.placeholder}</option>
                                 {(assignableOptions[column] ?? []).map((value) => (
@@ -507,8 +509,8 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
 
                         if (READ_ONLY_COLUMNS.includes(column)) {
                           return (
-                            <td key={column} className="p-1.5 align-top">
-                              <span className="block min-w-44 rounded-lg bg-slate-50 px-2 py-1.5 text-slate-600">
+                            <td key={column} className="p-0.5 align-top">
+                              <span className="block whitespace-nowrap rounded bg-slate-50 px-1.5 py-1 text-slate-600">
                                 {cellString(product.csvData[column]) || '—'}
                               </span>
                             </td>
@@ -516,15 +518,16 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         }
 
                         return (
-                          <td key={column} className="p-1.5 align-top">
+                          <td key={column} className="p-0.5 align-top">
                             <input
                               defaultValue={row[column] ?? ''}
+                              size={Math.min(30, Math.max(3, (row[column] ?? '').length))}
                               onBlur={(e) => {
                                 if (e.target.value !== cellString(product.csvData[column])) {
                                   saveCell(product, column, e.target.value)
                                 }
                               }}
-                              className="min-w-44 w-full rounded-lg border border-transparent bg-transparent px-2 py-1.5 outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
+                              className="rounded border border-transparent bg-transparent px-1.5 py-1 outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
                             />
                           </td>
                         )
