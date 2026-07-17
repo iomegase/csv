@@ -12,6 +12,7 @@ import {
   detectColumnMapping,
   getProductViewRows,
   isViewAvailable,
+  isWithoutFamily,
   PRODUCT_VIEWS,
   ProductViewId,
 } from '@/lib/product-views'
@@ -128,6 +129,17 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
     () => products.map((p) => Object.fromEntries(columns.map((c) => [c, cellString(p.csvData[c])]))),
     [products, columns],
   )
+
+  // Les familles réellement présentes, pour peupler le select des cellules
+  // « Pas de famille ». Triées, sans doublon, sans les valeurs « sans famille ».
+  const availableFamilies = useMemo(() => {
+    const set = new Set<string>()
+    for (const product of products) {
+      const value = cellString(product.csvData[COL.famille]).trim()
+      if (value && !isWithoutFamily(value)) set.add(value)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, 'fr'))
+  }, [products])
 
   const presetRows = useMemo(
     () => getProductViewRows(rows, activeView, mapping).map((row) => ({ row, index: rows.indexOf(row) })),
@@ -451,6 +463,25 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                               >
                                 {deleted ? 'Oui' : 'Non'}
                               </button>
+                            </td>
+                          )
+                        }
+
+                        // Cellule Famille « Pas de famille » (ou vide) : un select des
+                        // familles existantes, pour que l'admin en assigne une d'un clic.
+                        if (column === COL.famille && isWithoutFamily(cellString(product.csvData[column]))) {
+                          return (
+                            <td key={column} className="p-1.5 align-top">
+                              <select
+                                defaultValue=""
+                                onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
+                                className="min-w-44 w-full rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm outline-none focus:border-slate-600"
+                              >
+                                <option value="">Pas de famille</option>
+                                {availableFamilies.map((family) => (
+                                  <option key={family} value={family}>{family}</option>
+                                ))}
+                              </select>
                             </td>
                           )
                         }
