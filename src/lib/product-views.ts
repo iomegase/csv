@@ -69,6 +69,9 @@ const COLUMN_ALIASES: Record<keyof ColumnMapping, string[]> = {
     'prix vente',
     'prix public',
     'tarif vente',
+    // Le prix de vente ShopCaisse : « PRIX TTC - Défaut - Mon Magasin Caisse 1 ».
+    // « prix ttc » ne peut pas viser « Prix d'achat », qui n'est pas le prix de vente.
+    'prix ttc',
     'pv',
   ],
   family: ['famille', 'categorie', 'rayon', 'univers', 'groupe', 'collection'],
