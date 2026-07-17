@@ -16,6 +16,7 @@
   "dependencies": {
     "chardet": "^2.2.0",
     "iconv-lite": "^0.7.3",
+    "jszip": "^3.10.1",
     "lucide-react": "1.24.0",
     "mongoose": "^9.7.4",
     "next": "16.2.10",
