@@ -55,6 +55,19 @@ describe('createInvoiceImport', () => {
       createInvoiceImport({ buffer: Buffer.from('PK\x03\x04'), originalFileName: 'x.pdf', mimeType: 'application/pdf' }),
     ).rejects.toThrow(/PDF/)
   })
+
+  it('stocke la famille et le fournisseur choisis à l’import', async () => {
+    const result = await createInvoiceImport({
+      buffer: PDF(),
+      originalFileName: 'facture.pdf',
+      mimeType: 'application/pdf',
+      family: '  Vaisselle  ',
+      supplier: 'Moulin roty',
+    })
+    const doc = await InvoiceImport.findById(result.invoiceId)
+    expect(doc!.defaultFamily).toBe('Vaisselle')
+    expect(doc!.defaultSupplier).toBe('Moulin roty')
+  })
 })
 
 describe('analyse', () => {

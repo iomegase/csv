@@ -28,6 +28,14 @@ const InvoiceItemSchema = new Schema<InvoiceItem>(
   { _id: false },
 )
 
+// Effet de l'application d'une facture sur un produit EXISTANT : combien elle a
+// ajouté à son Stock souhaité. Permet d'annuler exactement l'effet si la facture
+// est supprimée. Les produits CRÉÉS, eux, sont retrouvés par createdFromInvoiceId.
+const CatalogEffectSchema = new Schema(
+  { productId: { type: Schema.Types.ObjectId, required: true }, addedQty: { type: Number, required: true } },
+  { _id: false },
+)
+
 const InvoiceImportSchema = new Schema(
   {
     originalFileName: { type: String, required: true },
@@ -48,6 +56,7 @@ const InvoiceImportSchema = new Schema(
     // Horodatage de l'application au catalogue. Non nul ⇒ stocks déjà ajoutés :
     // empêche le double comptage (D5).
     appliedToCatalogAt: { type: Date, default: null },
+    catalogEffects: { type: [CatalogEffectSchema], default: [] },
   },
   { timestamps: true },
 )

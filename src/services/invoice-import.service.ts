@@ -7,6 +7,7 @@ import { normalizeAzureInvoice } from '@/lib/azure-invoice-normalize'
 import { invoiceItemsToCsv, type CsvTemplateShape } from '@/lib/invoice-to-csv'
 import { getActiveTemplate } from '@/services/csv-template.service'
 import { beginInvoiceAnalysis, pollInvoiceAnalysis } from '@/services/azure-invoice.service'
+import { reverseInvoiceFromCatalog } from '@/services/invoice-catalog.service'
 
 export interface InvoiceImportResult {
   invoiceId: string
@@ -131,6 +132,9 @@ export async function validateInvoice(id: string): Promise<InvoiceImportDoc> {
 export async function deleteInvoiceImport(id: string): Promise<void> {
   assertId(id)
   await connectToDatabase()
+  // Défaire l'effet sur le stock avant de perdre la facture : produits créés
+  // retirés, quantités ajoutées aux produits existants retranchées.
+  await reverseInvoiceFromCatalog(id)
   await InvoiceImport.findByIdAndDelete(id)
 }
 

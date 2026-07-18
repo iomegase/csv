@@ -4,6 +4,7 @@ import { CsvTemplate } from '@/models/CsvTemplate'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { InvoiceImport, type InvoiceItem } from '@/models/InvoiceImport'
 import { applyInvoiceToCatalog } from '@/services/invoice-catalog.service'
+import { deleteInvoiceImport } from '@/services/invoice-import.service'
 import { validateMasterEntries } from '@/services/shopcaisse-validation.service'
 import type { MasterRow } from '@/lib/shopcaisse-columns'
 
@@ -274,6 +275,35 @@ describe('applyInvoiceToCatalog', () => {
     expect(summary.skipped).toHaveLength(1)
     expect(summary.created).toBe(0)
     expect(await CatalogProduct.countDocuments({})).toBe(0)
+  })
+
+  it('retire le stock de la facture quand elle est supprimée', async () => {
+    await makeActiveTemplate()
+    await seedProduct({
+      reference: 'REV',
+      name: 'Vase',
+      csvData: { Nom: 'Vase', Référence: 'REV', 'Stock actuel': '10' },
+    })
+    const invoiceId = await makeInvoice([
+      emptyItem({ supplierReference: 'REV', quantity: 6 }), // alimente un produit existant
+      emptyItem({ supplierReference: 'NEW-REV', description: 'Bol', quantity: 4 }), // crée un produit
+    ])
+    await applyInvoiceToCatalog(invoiceId)
+
+    // Après application : le produit existant est à 16 (10 + 6), le nouveau existe.
+    expect((await CatalogProduct.findOne({ reference: 'REV' }).lean())!.csvData).toMatchObject({
+      'Stock souhaité': '16',
+      'Mouvement stock': '6',
+    })
+    expect(await CatalogProduct.findOne({ reference: 'NEW-REV' }).lean()).not.toBeNull()
+
+    await deleteInvoiceImport(invoiceId)
+
+    // Le produit créé disparaît ; le produit existant revient à un mouvement nul.
+    expect(await CatalogProduct.findOne({ reference: 'NEW-REV' }).lean()).toBeNull()
+    const vase = await CatalogProduct.findOne({ reference: 'REV' }).lean()
+    expect(vase!.csvData).toMatchObject({ 'Stock souhaité': '10', 'Mouvement stock': '0' })
+    expect(await InvoiceImport.findById(invoiceId).lean()).toBeNull()
   })
 
   it('refuse une facture non validée', async () => {

@@ -155,6 +155,7 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
 
   // Seconde passe : une écriture par produit distinct.
   const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
+  const effects: Array<{ productId: Types.ObjectId; addedQty: number }> = []
 
   for (const [idStr, add] of matchedAdds) {
     const csv = byId.get(idStr)?.csvData ?? {}
@@ -195,6 +196,8 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
         ],
       },
     })
+    // Quantité ajoutée à ce produit existant : mémorisée pour l'annulation.
+    effects.push({ productId: new Types.ObjectId(idStr), addedQty: add.qty })
     summary.updated += 1
   }
 
@@ -241,9 +244,69 @@ export async function applyInvoiceToCatalog(invoiceId: string): Promise<ApplyInv
   }
 
   invoice.appliedToCatalogAt = new Date()
+  invoice.set('catalogEffects', effects)
   await invoice.save()
 
   return summary
+}
+
+/**
+ * Annule l'effet d'une facture sur le catalogue — appelé avant de la supprimer.
+ *
+ * Les produits qu'elle a CRÉÉS sont retirés (ils n'existaient que grâce à elle).
+ * Pour les produits EXISTANTS qu'elle a alimentés, on retranche du Stock souhaité
+ * la quantité qu'elle avait ajoutée (mémorisée dans `catalogEffects`) et on
+ * recalcule le mouvement : le mouvement qu'elle avait produit disparaît.
+ *
+ * Sans effet si la facture n'a jamais été appliquée.
+ */
+export async function reverseInvoiceFromCatalog(invoiceId: string): Promise<void> {
+  if (!isValidObjectId(invoiceId)) throw new Error('Identifiant de facture invalide.')
+  await connectToDatabase()
+
+  const invoice = await InvoiceImport.findById(invoiceId).select('appliedToCatalogAt catalogEffects').lean()
+  if (!invoice?.appliedToCatalogAt) return
+
+  // Produits créés par cette facture : ils partent avec elle.
+  await CatalogProduct.deleteMany({ createdFromInvoiceId: new Types.ObjectId(invoiceId) })
+
+  const effects = (invoice.catalogEffects ?? []) as Array<{ productId: Types.ObjectId; addedQty: number }>
+  const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
+
+  for (const effect of effects) {
+    const product = await CatalogProduct.findById(effect.productId).select('csvData').lean()
+    if (!product) continue
+
+    const csv = (product.csvData ?? {}) as Record<string, unknown>
+    const souhaite = readStockCell(csv[COL.stockSouhaite])
+    const current = souhaite.kind === 'number' ? souhaite.value : 0
+    const nextNum = current - effect.addedQty
+    // On ne laisse pas un 0 trompeur : sous 1, on vide la cible.
+    const newSouhaite = nextNum > 0 ? String(nextNum) : null
+    const movement = computeMovement(csv[COL.stockActuel], newSouhaite)
+    const movementValue = movement.kind === 'value' ? movement.text : null
+
+    operations.push({
+      updateOne: {
+        filter: { _id: effect.productId },
+        update: [
+          {
+            $set: {
+              csvData: {
+                $setField: {
+                  field: COL.mouvementStock,
+                  input: { $setField: { field: COL.stockSouhaite, input: '$csvData', value: newSouhaite } },
+                  value: movementValue,
+                },
+              },
+            },
+          },
+        ],
+      },
+    })
+  }
+
+  if (operations.length) await CatalogProduct.bulkWrite(operations, { ordered: false })
 }
 
 function addToIndex(index: Map<string, Types.ObjectId[]>, key: string, id: Types.ObjectId) {
