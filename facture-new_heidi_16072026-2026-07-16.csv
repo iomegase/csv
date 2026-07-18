@@ -1,0 +1,50 @@
+﻿Identifiant;Nom;Famille;Rangs;Fournisseur;TVA sur place;TVA à emporter;Type;Code barre;Référence;Description;Unité;Gestion du stock;Affichage du stock;PRIX TTC - Défaut - Mon Magasin Caisse 1;Couleur de fond;Texte du bouton;Supprimé;Prix d'achat
+;[DP0001] Dessous de plat sapin blanc;;;;;;;;;;;6;;;;;;8.4
+;[DP0005] Dessous de plat montagne;;;;;;;;;;;6;;;;;;8.4
+;[DP0016] Dessous de plat drapeau suisse;;;;;;;;;;;6;;;;;;8.4
+;[DP0017] Dessous de plat drapeau savoyard;;;;;;;;;;;12;;;;;;8.4
+;[DPC] Dessous de plat motif cerfs;;;;;;;;;;;6;;;;;;8.4
+;[DPFL] Dessous de plat motif flocon;;;;;;;;;;;6;;;;;;8.4
+;[DPMO] Dessous de plat motif montagne;;;;;;;;;;;6;;;;;;8.4
+;[DP0006] Set de 2 sous-verre flocon;;;;;;;;;;;12;;;;;;4.8
+;[DE0052] Gant à couverts flocon marron;;;;;;;;;;;18;;;;;;4.4
+;[CO0005] Coussin montagne (double);;;;;;;;;;;2;;;;;;22
+;[CO0004] Coussin montagne (simple);;;;;;;;;;;2;;;;;;18
+;[CO0006] Coussin edelweiss;;;;;;;;;;;6;;;;;;23.6
+;[SU0024] Nuage à suspendre;;;;;;;;;;;2;;;;;;14
+;[SU0028] Edelweiss à suspendre;;;;;;;;;;;24;;;;;;3.6
+;[SU0013] Coeur gris + edelweiss à suspendre;;;;;;;;;;;24;;;;;;3.6
+;[SU0023] Coeur Edelweiss Rouge;;;;;;;;;;;12;;;;;;3.6
+;[SU0011] Flocon à suspendre 11 cm;;;;;;;;;;;12;;;;;;3.4
+;[SU0025] Etoile à suspendre;;;;;;;;;;;12;;;;;;3.4
+;[SU0027] Coeur blanc à suspendre;;;;;;;;;;;12;;;;;;3.4
+;[SU0029] Flocon murale;;;;;;;;;;;6;;;;;;14
+;[DE0045] Guirlandes Edelweiss 150cm;;;;;;;;;;;24;;;;;;6.6
+;[DE0044] Guirlande de coeurs 150cm;;;;;;;;;;;12;;;;;;6.6
+;[DE0043] Guirlande etoile 150cm;;;;;;;;;;;12;;;;;;6.6
+;[DE0046] Guirlandes petites boules 150cm (Blanc);;;;;;;;;;;1;;;;;;6.6
+;[DE0047] Guirlandes boules (blanc) 200cm;;;;;;;;;;;12;;;;;;7.2
+;[DE0041] Set de 3 sapin blanc;;;;;;;;;;;6;;;;;;11.2
+;[TA0001] Tapis mouton;;;;;;;;;;;2;;;;;;39.6
+;[SU0020] Couronne Edelweiss;;;;;;;;;;;6;;;;;;11.6
+;[PCMO] Porte clé Montagne;;;;;;;;;;;12;;;;;;2
+;[PCED] Porte clé Edelweiss;;;;;;;;;;;24;;;;;;2
+;[DE0029] Mouton blanc 7,5 cm;;;;;;;;;;;12;;;;;;6
+;[DE0030] Mouton blanc 12 cm;;;;;;;;;;;12;;;;;;7.8
+;[DE0031] Bélier blanc 7,5 cm;;;;;;;;;;;12;;;;;;6
+;[DE0032] Bélier blanc 12 cm;;;;;;;;;;;12;;;;;;7.8
+;[DE0033] Petit bouquetin;;;;;;;;;;;12;;;;;;6
+;[DE0034] Grand bouquetin;;;;;;;;;;;12;;;;;;7.8
+;[DE0053] Vache boule 12cm (noir);;;;;;;;;;;12;;;;;;7.8
+;[DE0054] Vache boule 12cm (marron);;;;;;;;;;;12;;;;;;7.8
+;[DE0055] Vache boule 7,5 cm (noir);;;;;;;;;;;12;;;;;;6
+;[DE0056] Vache boule 7,5 cm (marron);;;;;;;;;;;12;;;;;;6
+;[DE0057] Cerf boule 12cm;;;;;;;;;;;12;;;;;;7.8
+;[DE0058] Cerf boule 7,5cm;;;;;;;;;;;12;;;;;;6
+;[DE0063] Cerf boule blanc 12cm;;;;;;;;;;;12;;;;;;7.8
+;[DE0064] Cerf boule blanc 7,5cm;;;;;;;;;;;12;;;;;;6
+;[DE0024] Bonhomme de neige double;;;;;;;;;;;6;;;;;;11.6
+;[FL0019] Branche claire de baies blanches;;;;;;;;;;;24;;;;;;3.6
+;[FL0005] Branche foncée de baies rouges;;;;;;;;;;;6;;;;;;3.6
+;[FL0029] Branche de Mimosas;;;;;;;;;;;24;;;;;;4.6
+;[FL0044] Bourgeon blanc et vert;;;;;;;;;;;12;;;;;;3.6
