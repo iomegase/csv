@@ -2,12 +2,11 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FileSpreadsheet, FileText, GitCompare, Home, Package, Tags, Truck } from 'lucide-react'
+import { FileSpreadsheet, FileText, GitCompare, Home, Tags, Truck } from 'lucide-react'
 
 const ITEMS = [
   { href: '/tous-les-produits', label: 'Produits Shopcaisse', icon: Home },
   { href: '/admin/invoices', label: 'Importer facture', icon: FileText },
-  { href: '/catalogue', label: 'Stock', icon: Package },
   { href: '/familles', label: 'Familles', icon: Tags },
   { href: '/fournisseurs', label: 'Fournisseurs', icon: Truck },
   { href: '/admin/catalog/diff', label: 'Comparer', icon: GitCompare },
