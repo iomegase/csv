@@ -36,6 +36,24 @@ describe('diffCatalogAgainstSource', () => {
     expect(diff.modified[0].fields).toEqual([{ column: 'Quantité', from: '10', to: '16' }])
   })
 
+  it('numérote les lignes comme le tableau maître (position triée par _id)', async () => {
+    const templateId = await makeActiveTemplate()
+    // 1re ligne : inchangée. 2e : modifiée. 3e : ajoutée (créée par facture).
+    await CatalogProduct.create({ templateId, name: 'A', csvData: { Nom: 'A' }, originalCsvData: { Nom: 'A' } })
+    await CatalogProduct.create({ templateId, name: 'B', csvData: { Nom: 'B2' }, originalCsvData: { Nom: 'B' } })
+    await CatalogProduct.create({
+      templateId,
+      name: 'C',
+      csvData: { Nom: 'C' },
+      createdFromInvoiceId: new Types.ObjectId(),
+    })
+
+    const diff = await diffCatalogAgainstSource()
+    // Le maître montre A(1), B(2), C(3) triés par _id : le diff reprend ces numéros.
+    expect(diff.modified[0].row).toBe(2)
+    expect(diff.added[0].row).toBe(3)
+  })
+
   it('classe un produit créé par une facture en « ajouté »', async () => {
     const templateId = await makeActiveTemplate()
     await CatalogProduct.create({

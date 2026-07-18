@@ -1,12 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AlertTriangle, FileMinus2, FilePen, FilePlus2, Scale } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { AlertTriangle, ChevronDown, FileMinus2, FilePen, FilePlus2, Scale } from 'lucide-react'
 
 interface Diff {
-  added: Array<{ id: string; name: string | null }>
-  removed: Array<{ name: string | null; original: Record<string, string> }>
-  modified: Array<{ id: string; name: string | null; fields: Array<{ column: string; from: string | null; to: string | null }> }>
+  added: Array<{ id: string; name: string | null; row: number }>
+  removed: Array<{ name: string | null; original: Record<string, string>; row: number }>
+  modified: Array<{
+    id: string
+    name: string | null
+    row: number
+    fields: Array<{ column: string; from: string | null; to: string | null }>
+  }>
 }
 
 interface RowIssue {
@@ -34,6 +39,170 @@ interface Validation {
   conflicts: RowIssue[]
   alignmentIssues: Array<{ row: number; column: string; product: string; stock: string }>
   canExport: boolean
+}
+
+const PAGE_SIZE = 25
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="mt-3 flex items-center justify-end gap-2 text-sm text-slate-600">
+      <button
+        type="button"
+        disabled={page === 1}
+        onClick={() => onChange(page - 1)}
+        className="rounded-lg border border-slate-300 px-3 py-1 font-medium disabled:opacity-40"
+      >
+        Précédent
+      </button>
+      <span className="min-w-24 text-center">Page {page} / {totalPages}</span>
+      <button
+        type="button"
+        disabled={page === totalPages}
+        onClick={() => onChange(page + 1)}
+        className="rounded-lg border border-slate-300 px-3 py-1 font-medium disabled:opacity-40"
+      >
+        Suivant
+      </button>
+    </div>
+  )
+}
+
+/** En-tête cliquable d'accordéon, avec compteur et chevron. */
+function AccordionHeader({
+  icon,
+  colorClass,
+  title,
+  count,
+  open,
+  onToggle,
+}: {
+  icon: ReactNode
+  colorClass: string
+  title: string
+  count: number
+  open: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left">
+      <span className={`flex items-center gap-2 text-lg font-semibold ${colorClass}`}>
+        {icon} {title} ({count})
+      </span>
+      <ChevronDown className={`h-5 w-5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+    </button>
+  )
+}
+
+/** Section « Ajoutés » / « Supprimés » : accordéon + pagination + numéro de ligne du maître. */
+function ListSection({
+  icon,
+  colorClass,
+  title,
+  items,
+}: {
+  icon: ReactNode
+  colorClass: string
+  title: string
+  items: Array<{ key: string; row: number; name: string | null }>
+}) {
+  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const current = Math.min(page, totalPages)
+  const slice = items.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <AccordionHeader icon={icon} colorClass={colorClass} title={title} count={items.length} open={open} onToggle={() => setOpen((o) => !o)} />
+      {open && (
+        <div className="border-t border-slate-100 px-4 py-3">
+          {items.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucun.</p>
+          ) : (
+            <>
+              <ul className="text-sm text-slate-700">
+                {slice.map((item) => (
+                  <li key={item.key} className="flex gap-3 border-b border-slate-100 py-1 last:border-0">
+                    <span className="w-12 shrink-0 text-right font-semibold tabular-nums text-slate-400">{item.row}</span>
+                    <span>{item.name ?? '(sans nom)'}</span>
+                  </li>
+                ))}
+              </ul>
+              <Pagination page={current} totalPages={totalPages} onChange={setPage} />
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** Section « Modifiés » : accordéon + pagination par article + numéro de ligne du maître. */
+function ModifiedSection({ items }: { items: Diff['modified'] }) {
+  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const current = Math.min(page, totalPages)
+  const slice = items.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <AccordionHeader
+        icon={<FilePen className="h-5 w-5" />}
+        colorClass="text-amber-700"
+        title="Modifiés"
+        count={items.length}
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
+      />
+      {open && (
+        <div className="border-t border-slate-100 px-4 py-3">
+          {items.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucun.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Ligne</th>
+                      <th className="px-4 py-2 font-medium">Article</th>
+                      <th className="px-4 py-2 font-medium">Colonne</th>
+                      <th className="px-4 py-2 font-medium">Original</th>
+                      <th className="px-4 py-2 font-medium">Copie de travail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {slice.flatMap((m) =>
+                      m.fields.map((f, i) => (
+                        <tr key={`${m.id}:${f.column}`} className="border-t border-slate-100">
+                          {i === 0 && (
+                            <td className="px-4 py-2 text-right font-semibold tabular-nums text-slate-400" rowSpan={m.fields.length}>
+                              {m.row}
+                            </td>
+                          )}
+                          {i === 0 && (
+                            <td className="px-4 py-2 font-medium text-slate-800" rowSpan={m.fields.length}>
+                              {m.name ?? '(sans nom)'}
+                            </td>
+                          )}
+                          <td className="px-4 py-2 text-slate-700">{f.column}</td>
+                          <td className="px-4 py-2 text-red-700">{f.from ?? '—'}</td>
+                          <td className="px-4 py-2 text-emerald-700">{f.to ?? '—'}</td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination page={current} totalPages={totalPages} onChange={setPage} />
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 export function CatalogDiffView() {
@@ -64,6 +233,7 @@ export function CatalogDiffView() {
         <h1 className="text-2xl font-semibold text-slate-900">Comparer avec l’original</h1>
         <p className="mt-1 text-sm text-slate-600">
           Copie de travail vs import de référence : {diff.added.length} ajouté(s), {diff.removed.length} supprimé(s), {diff.modified.length} modifié(s).
+          Le numéro de ligne est le même que dans le tableau maître.
         </p>
       </div>
 
@@ -164,44 +334,21 @@ export function CatalogDiffView() {
         </section>
       )}
 
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-emerald-700"><FilePlus2 className="h-5 w-5" /> Ajoutés ({diff.added.length})</h2>
-        {diff.added.length === 0 ? <p className="text-sm text-slate-500">Aucun.</p> : (
-          <ul className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
-            {diff.added.map((a) => <li key={a.id} className="border-b border-slate-100 py-1 last:border-0">{a.name ?? '(sans nom)'}</li>)}
-          </ul>
-        )}
-      </section>
+      <ListSection
+        icon={<FilePlus2 className="h-5 w-5" />}
+        colorClass="text-emerald-700"
+        title="Ajoutés"
+        items={diff.added.map((a) => ({ key: a.id, row: a.row, name: a.name }))}
+      />
 
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-red-700"><FileMinus2 className="h-5 w-5" /> Supprimés ({diff.removed.length})</h2>
-        {diff.removed.length === 0 ? <p className="text-sm text-slate-500">Aucun.</p> : (
-          <ul className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm">
-            {diff.removed.map((r, i) => <li key={i} className="border-b border-slate-100 py-1 last:border-0">{r.name ?? '(sans nom)'}</li>)}
-          </ul>
-        )}
-      </section>
+      <ListSection
+        icon={<FileMinus2 className="h-5 w-5" />}
+        colorClass="text-red-700"
+        title="Supprimés"
+        items={diff.removed.map((r, i) => ({ key: `${r.row}:${i}`, row: r.row, name: r.name }))}
+      />
 
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-amber-700"><FilePen className="h-5 w-5" /> Modifiés ({diff.modified.length})</h2>
-        {diff.modified.length === 0 ? <p className="text-sm text-slate-500">Aucun.</p> : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-slate-600"><tr><th className="px-4 py-2 font-medium">Article</th><th className="px-4 py-2 font-medium">Colonne</th><th className="px-4 py-2 font-medium">Original</th><th className="px-4 py-2 font-medium">Copie de travail</th></tr></thead>
-              <tbody>
-                {diff.modified.flatMap((m) => m.fields.map((f, i) => (
-                  <tr key={`${m.id}:${f.column}`} className="border-t border-slate-100">
-                    {i === 0 && <td className="px-4 py-2 font-medium text-slate-800" rowSpan={m.fields.length}>{m.name ?? '(sans nom)'}</td>}
-                    <td className="px-4 py-2 text-slate-700">{f.column}</td>
-                    <td className="px-4 py-2 text-red-700">{f.from ?? '—'}</td>
-                    <td className="px-4 py-2 text-emerald-700">{f.to ?? '—'}</td>
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <ModifiedSection items={diff.modified} />
     </div>
   )
 }

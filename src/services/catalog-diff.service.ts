@@ -4,11 +4,14 @@ import { getActiveTemplate } from '@/services/csv-template.service'
 import { detectIdentityMapping } from '@/lib/catalog-columns'
 
 export interface CatalogDiff {
-  added: Array<{ id: string; name: string | null }>
-  removed: Array<{ name: string | null; original: Record<string, string> }>
+  // `row` : numéro de ligne 1-based dans le tableau maître (produits triés par
+  // _id), identique à la colonne « # » du maître, pour retrouver la ligne.
+  added: Array<{ id: string; name: string | null; row: number }>
+  removed: Array<{ name: string | null; original: Record<string, string>; row: number }>
   modified: Array<{
     id: string
     name: string | null
+    row: number
     fields: Array<{ column: string; from: string | null; to: string | null }>
   }>
 }
@@ -46,13 +49,16 @@ export async function diffCatalogAgainstSource(): Promise<CatalogDiff> {
   const columnNames = [...template.columns].sort((a, b) => a.position - b.position).map((c) => c.name)
   const nameColumn = detectIdentityMapping(columnNames).name
 
+  // Trié par _id, comme le tableau maître : l'index+1 donne le même numéro de ligne.
   const products = await CatalogProduct.find({})
+    .sort({ _id: 1 })
     .select('name csvData originalCsvData createdFromInvoiceId isDeleted')
     .lean()
 
   const diff: CatalogDiff = { added: [], removed: [], modified: [] }
 
-  for (const product of products) {
+  for (const [index, product] of products.entries()) {
+    const row = index + 1
     const csvData = (product.csvData ?? {}) as Record<string, unknown>
     const original = (product.originalCsvData ?? null) as Record<string, unknown> | null
     const name =
@@ -65,12 +71,12 @@ export async function diffCatalogAgainstSource(): Promise<CatalogDiff> {
     if (product.isDeleted) {
       // Un article d'origine supprimé compte comme « supprimé ». Un article
       // ajouté puis supprimé s'annule (ni ajouté ni supprimé).
-      if (!isAdded) diff.removed.push({ name, original: stringifyRecord(original) })
+      if (!isAdded) diff.removed.push({ name, original: stringifyRecord(original), row })
       continue
     }
 
     if (isAdded) {
-      diff.added.push({ id: String(product._id), name })
+      diff.added.push({ id: String(product._id), name, row })
       continue
     }
 
@@ -87,7 +93,7 @@ export async function diffCatalogAgainstSource(): Promise<CatalogDiff> {
         fields.push({ column, from: from === '' ? null : from, to: to === '' ? null : to })
       }
     }
-    if (fields.length) diff.modified.push({ id: String(product._id), name, fields })
+    if (fields.length) diff.modified.push({ id: String(product._id), name, row, fields })
   }
 
   return diff
