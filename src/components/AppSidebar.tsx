@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { FileSpreadsheet, FileText, GitCompare, Home, Package, Tags, Truck } from 'lucide-react'
 
 const ITEMS = [
-  { href: '/tous-les-produits', label: 'Accueil', icon: Home },
+  { href: '/tous-les-produits', label: 'Produits Shopcaisse', icon: Home },
   { href: '/admin/invoices', label: 'Factures', icon: FileText },
   { href: '/catalogue', label: 'Stock', icon: Package },
   { href: '/familles', label: 'Familles', icon: Tags },
