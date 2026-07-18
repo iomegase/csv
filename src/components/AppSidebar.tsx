@@ -6,7 +6,7 @@ import { FileSpreadsheet, FileText, GitCompare, Home, Package, Tags, Truck } fro
 
 const ITEMS = [
   { href: '/tous-les-produits', label: 'Produits Shopcaisse', icon: Home },
-  { href: '/admin/invoices', label: 'Factures', icon: FileText },
+  { href: '/admin/invoices', label: 'Importer facture', icon: FileText },
   { href: '/catalogue', label: 'Stock', icon: Package },
   { href: '/familles', label: 'Familles', icon: Tags },
   { href: '/fournisseurs', label: 'Fournisseurs', icon: Truck },
