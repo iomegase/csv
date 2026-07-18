@@ -21,3 +21,9 @@ next-env.d.ts
 
 # scratch du pilotage par sous-agents
 /.superpowers
+
+# Fichiers de données importés localement (ne pas versionner)
+/*.pdf
+/Produits_du_*.csv
+/Visualisation_des_stocks_*.csv
+/facture-*.csv
