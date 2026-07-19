@@ -476,7 +476,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
               donc le thead sticky réellement collant. */}
           <div className="max-h-[calc(100vh-15rem)] overflow-auto">
             <table className="w-max border-collapse text-[11px]">
-              <thead className="sticky top-0 z-10 bg-slate-900 text-left text-white">
+              <thead className="sticky top-0 z-10 bg-slate-900 text-center text-white">
                 <tr>
                   <th className="sticky left-0 z-20 w-9 bg-slate-900 px-2 py-1.5 text-center font-semibold">
                     <input
@@ -487,7 +487,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                       className="h-3.5 w-3.5 cursor-pointer align-middle"
                     />
                   </th>
-                  <th className="sticky left-9 z-20 w-10 bg-slate-900 px-2 py-1.5 text-right font-semibold">#</th>
+                  <th className="sticky left-9 z-20 w-10 bg-slate-900 px-2 py-1.5 text-center font-semibold">#</th>
                   {columns.map((c) => <th key={c} className="whitespace-nowrap px-2 py-1.5 font-semibold">{c}</th>)}
                 </tr>
               </thead>
@@ -515,7 +515,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : isSelected ? 'bg-sky-50' : ''
                       }`}
                     >
-                      <td className={`sticky left-0 z-10 w-9 px-2 py-1 text-center align-top ${stickyBg}`}>
+                      <td className={`sticky left-0 z-10 w-9 px-2 py-1 text-center align-middle ${stickyBg}`}>
                         <input
                           type="checkbox"
                           checked={isSelected}
@@ -524,14 +524,14 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         />
                       </td>
                       {/* Position absolue dans le tableau maître : le même numéro que la page Comparer. */}
-                      <td className={`sticky left-9 z-10 w-10 px-2 py-1 text-right align-top text-[11px] font-semibold tabular-nums text-slate-500 ${stickyBg}`}>
+                      <td className={`sticky left-9 z-10 w-10 px-2 py-1 text-center align-middle text-[11px] font-semibold tabular-nums text-slate-500 ${stickyBg}`}>
                         {index + 1}
                       </td>
                       {columns.map((column) => {
                         if (column === COL.supprime) {
                           const deleted = cellString(product.csvData[COL.supprime]) === '1'
                           return (
-                            <td key={column} className="p-0.5 align-top">
+                            <td key={column} className="p-0.5 text-center align-middle">
                               <button
                                 type="button"
                                 onClick={() => toggleSupprime(product)}
@@ -553,7 +553,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         const assignable = ASSIGNABLE_COLUMNS.find((entry) => entry.column === column)
                         if (assignable && isUnassigned(cellString(product.csvData[column]), assignable.sentinel)) {
                           return (
-                            <td key={column} className="p-0.5 align-top">
+                            <td key={column} className="p-0.5 text-center align-middle">
                               <select
                                 defaultValue=""
                                 onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
@@ -570,7 +570,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
 
                         if (READ_ONLY_COLUMNS.includes(column)) {
                           return (
-                            <td key={column} className="p-0.5 align-top">
+                            <td key={column} className="p-0.5 text-center align-middle">
                               <span className="block whitespace-nowrap rounded bg-slate-50 px-1.5 py-1 text-slate-600">
                                 {cellString(product.csvData[column]) || '—'}
                               </span>
@@ -579,7 +579,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         }
 
                         return (
-                          <td key={column} className="p-0.5 align-top">
+                          <td key={column} className="p-0.5 text-center align-middle">
                             <input
                               defaultValue={row[column] ?? ''}
                               size={Math.min(30, Math.max(3, (row[column] ?? '').length))}
@@ -588,7 +588,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                                   saveCell(product, column, e.target.value)
                                 }
                               }}
-                              className="rounded border border-transparent bg-transparent px-1.5 py-1 outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
+                              className="rounded border border-transparent bg-transparent px-1.5 py-1 text-center outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
                             />
                           </td>
                         )
