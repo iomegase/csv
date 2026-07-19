@@ -485,7 +485,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
               donc le thead sticky réellement collant. */}
           <div className="max-h-[calc(100vh-15rem)] overflow-auto">
             <table className="w-max border-collapse text-[11px]">
-              <thead className="sticky top-0 z-10 bg-slate-900 text-center text-white">
+              <thead className="sticky top-0 z-10 bg-slate-900 text-left text-white">
                 <tr>
                   <th className="sticky left-0 z-20 w-9 bg-slate-900 px-2 py-1.5 text-center font-semibold">
                     <input
@@ -540,7 +540,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         if (column === COL.supprime) {
                           const deleted = cellString(product.csvData[COL.supprime]) === '1'
                           return (
-                            <td key={column} className="p-0.5 text-center align-middle">
+                            <td key={column} className="p-0.5 text-left align-middle">
                               <button
                                 type="button"
                                 onClick={() => toggleSupprime(product)}
@@ -562,7 +562,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         const assignable = ASSIGNABLE_COLUMNS.find((entry) => entry.column === column)
                         if (assignable && isUnassigned(cellString(product.csvData[column]), assignable.sentinel)) {
                           return (
-                            <td key={column} className="p-0.5 text-center align-middle">
+                            <td key={column} className="p-0.5 text-left align-middle">
                               <select
                                 defaultValue=""
                                 onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
@@ -579,7 +579,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
 
                         if (READ_ONLY_COLUMNS.includes(column)) {
                           return (
-                            <td key={column} className="p-0.5 text-center align-middle">
+                            <td key={column} className="p-0.5 text-left align-middle">
                               <span className="block whitespace-nowrap rounded bg-slate-50 px-1.5 py-1 text-slate-600">
                                 {cellString(product.csvData[column]) || '—'}
                               </span>
@@ -588,7 +588,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                         }
 
                         return (
-                          <td key={column} className="p-0.5 text-center align-middle">
+                          <td key={column} className="p-0.5 text-left align-middle">
                             <input
                               defaultValue={row[column] ?? ''}
                               size={Math.min(30, Math.max(3, (row[column] ?? '').length))}
@@ -597,7 +597,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                                   saveCell(product, column, e.target.value)
                                 }
                               }}
-                              className="rounded border border-transparent bg-transparent px-1.5 py-1 text-center outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
+                              className="rounded border border-transparent bg-transparent px-1.5 py-1 text-left outline-none hover:border-slate-300 hover:bg-white focus:border-slate-600 focus:bg-white"
                             />
                           </td>
                         )
