@@ -8,6 +8,7 @@ import { computeMovement } from '@/lib/shopcaisse-stock'
 import { CsvFilter, CsvRow, FilterOperator, matchesFilter } from '@/lib/csv'
 import { PurgeDataButton } from '@/components/catalog/PurgeDataButton'
 import { BulkEditModal } from '@/components/catalog/BulkEditModal'
+import { ColorCell } from '@/components/catalog/ColorCell'
 import {
   ColumnMapping,
   detectColumnMapping,
@@ -156,6 +157,16 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
       out[column] = [...set].sort((a, b) => a.localeCompare(b, 'fr'))
     }
     return out
+  }, [products])
+
+  // Les couleurs de fond déjà utilisées, pour le sélecteur de pastilles.
+  const availableColors = useMemo(() => {
+    const set = new Set<string>()
+    for (const product of products) {
+      const value = cellString(product.csvData[COL.couleurFond]).trim()
+      if (value) set.add(value)
+    }
+    return [...set].sort()
   }, [products])
 
   const presetRows = useMemo(
@@ -573,6 +584,19 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                                   <option key={value} value={value}>{value}</option>
                                 ))}
                               </select>
+                            </td>
+                          )
+                        }
+
+                        // Couleur de fond : une pastille + un menu de couleurs, plutôt que le code hexa.
+                        if (column === COL.couleurFond) {
+                          return (
+                            <td key={column} className="p-0.5 text-left align-middle">
+                              <ColorCell
+                                value={cellString(product.csvData[column])}
+                                options={availableColors}
+                                onChange={(color) => saveCell(product, column, color)}
+                              />
                             </td>
                           )
                         }
