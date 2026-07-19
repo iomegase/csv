@@ -7,6 +7,7 @@ import { COL } from '@/lib/shopcaisse-columns'
 import { computeMovement } from '@/lib/shopcaisse-stock'
 import { CsvFilter, CsvRow, FilterOperator, matchesFilter } from '@/lib/csv'
 import { PurgeDataButton } from '@/components/catalog/PurgeDataButton'
+import { BulkEditModal } from '@/components/catalog/BulkEditModal'
 import {
   ColumnMapping,
   detectColumnMapping,
@@ -102,6 +103,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
   const [loading, setLoading] = useState(true)
   const [showMapping, setShowMapping] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
   const savingRef = useRef<Record<string, boolean>>({})
   const [bundle, setBundle] = useState<BundleValidation | null>(null)
   const [bundleBusy, setBundleBusy] = useState(false)
@@ -461,6 +463,13 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                 <strong className="text-slate-900">Sélectionnés :</strong> {selected.size}
                 <button
                   type="button"
+                  onClick={() => setBulkOpen(true)}
+                  className="rounded-lg bg-slate-900 px-2.5 py-0.5 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Modifier la sélection
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSelected(new Set())}
                   className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs font-medium hover:bg-slate-50"
                 >
@@ -613,6 +622,20 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             </div>
           </footer>
         </section>
+
+        {bulkOpen && (
+          <BulkEditModal
+            ids={[...selected]}
+            families={assignableOptions[COL.famille] ?? []}
+            suppliers={assignableOptions[COL.fournisseur] ?? []}
+            onClose={() => setBulkOpen(false)}
+            onApplied={async () => {
+              setBulkOpen(false)
+              setSelected(new Set())
+              await load().catch(() => setError('Rechargement impossible.'))
+            }}
+          />
+        )}
       </div>
     </main>
   )

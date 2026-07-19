@@ -2,6 +2,7 @@ import { connectToDatabase } from '@/lib/mongodb'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { COL } from '@/lib/shopcaisse-columns'
 import { computeMovement, readStockCell } from '@/lib/shopcaisse-stock'
+import { parseLocalizedNumber } from '@/lib/product-views'
 import { normalizeSupprime } from '@/services/shopcaisse-master.service'
 import { isValidObjectId, Types } from 'mongoose'
 
@@ -163,4 +164,53 @@ export async function softDeleteCatalogProduct(id: string): Promise<void> {
   if (!isValidObjectId(id)) throw new Error('Identifiant de produit invalide.')
   await connectToDatabase()
   await CatalogProduct.updateOne({ _id: new Types.ObjectId(id) }, { $set: { isDeleted: true } })
+}
+
+export type BulkAction =
+  | { type: 'family'; value: string }
+  | { type: 'supplier'; value: string }
+  | { type: 'ttcFromHt'; coefficient: number }
+
+/**
+ * Édition en masse d'une sélection de produits.
+ *
+ * - `family` / `supplier` : pose la même valeur sur tout le lot.
+ * - `ttcFromHt` : calcule le Prix TTC = Prix d'achat (HT) × coefficient, produit
+ *   par produit (chaque HT diffère). Un produit sans HT lisible est ignoré.
+ *
+ * On écrit toujours via `$setField` (clé littérale) : les intitulés portent des
+ * espaces (et le prix TTC un tiret), qu'un chemin pointé scinderait.
+ */
+export async function bulkUpdateProducts(ids: string[], action: BulkAction): Promise<{ updated: number }> {
+  await connectToDatabase()
+  const objectIds = ids.filter((id) => isValidObjectId(id)).map((id) => new Types.ObjectId(id))
+  if (!objectIds.length) return { updated: 0 }
+
+  if (action.type === 'family' || action.type === 'supplier') {
+    const column = action.type === 'family' ? COL.famille : COL.fournisseur
+    const res = await CatalogProduct.updateMany(
+      { _id: { $in: objectIds } },
+      [{ $set: { csvData: { $setField: { field: column, input: '$csvData', value: action.value } } } }],
+      { updatePipeline: true },
+    )
+    return { updated: res.modifiedCount }
+  }
+
+  // ttcFromHt : chaque produit a son propre HT, donc une écriture par produit.
+  const products = await CatalogProduct.find({ _id: { $in: objectIds } }).select('csvData').lean()
+  const operations: Parameters<typeof CatalogProduct.bulkWrite>[0] = []
+  for (const product of products) {
+    const csv = (product.csvData ?? {}) as Record<string, unknown>
+    const ht = parseLocalizedNumber(String(csv[COL.prixAchat] ?? ''))
+    if (ht === null) continue
+    const ttc = (ht * action.coefficient).toFixed(2)
+    operations.push({
+      updateOne: {
+        filter: { _id: product._id },
+        update: [{ $set: { csvData: { $setField: { field: COL.prixTtc, input: '$csvData', value: ttc } } } }],
+      },
+    })
+  }
+  if (operations.length) await CatalogProduct.bulkWrite(operations, { ordered: false })
+  return { updated: operations.length }
 }
