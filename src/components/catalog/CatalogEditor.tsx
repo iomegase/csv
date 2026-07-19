@@ -101,6 +101,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [showMapping, setShowMapping] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
   const savingRef = useRef<Record<string, boolean>>({})
   const [bundle, setBundle] = useState<BundleValidation | null>(null)
   const [bundleBusy, setBundleBusy] = useState(false)
@@ -171,6 +172,29 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const currentPage = Math.min(page, totalPages)
   const pageRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  // Sélection multi-produits. « Tout cocher » agit sur la page affichée.
+  const pageProductIds = pageRows
+    .map(({ index }) => products[index]?.id)
+    .filter((id): id is string => Boolean(id))
+  const allPageSelected = pageProductIds.length > 0 && pageProductIds.every((id) => selected.has(id))
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  function toggleSelectPage() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allPageSelected) pageProductIds.forEach((id) => next.delete(id))
+      else pageProductIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
 
   async function saveCell(product: Product, column: string, value: string) {
     const key = `${product.id}:${column}`
@@ -428,10 +452,22 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             </div>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200 pt-4 text-sm text-slate-600">
+          <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-slate-200 pt-4 text-sm text-slate-600">
             <span><strong className="text-slate-900">Total :</strong> {products.length}</span>
             <span><strong className="text-slate-900">Dans cette vue :</strong> {presetRows.length}</span>
             <span><strong className="text-slate-900">Après recherche :</strong> {filteredRows.length}</span>
+            {selected.size > 0 && (
+              <span className="flex items-center gap-2">
+                <strong className="text-slate-900">Sélectionnés :</strong> {selected.size}
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="rounded-lg border border-slate-300 px-2 py-0.5 text-xs font-medium hover:bg-slate-50"
+                >
+                  Tout désélectionner
+                </button>
+              </span>
+            )}
           </div>
         </section>
 
@@ -442,7 +478,16 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
             <table className="w-max border-collapse text-[11px]">
               <thead className="sticky top-0 z-10 bg-slate-900 text-left text-white">
                 <tr>
-                  <th className="sticky left-0 z-20 w-10 bg-slate-900 px-2 py-1.5 text-right font-semibold">#</th>
+                  <th className="sticky left-0 z-20 w-9 bg-slate-900 px-2 py-1.5 text-center font-semibold">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      onChange={toggleSelectPage}
+                      title="Sélectionner toute la page"
+                      className="h-3.5 w-3.5 cursor-pointer align-middle"
+                    />
+                  </th>
+                  <th className="sticky left-9 z-20 w-10 bg-slate-900 px-2 py-1.5 text-right font-semibold">#</th>
                   {columns.map((c) => <th key={c} className="whitespace-nowrap px-2 py-1.5 font-semibold">{c}</th>)}
                 </tr>
               </thead>
@@ -454,20 +499,32 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                     ? [...bundle.blockers, ...bundle.conflicts].find((i) => i.id === product.id)
                     : undefined
                   const isNew = !cellString(product.csvData[COL.identifiant])
+                  const isSelected = selected.has(product.id)
+                  const stickyBg = issue
+                    ? 'bg-red-50'
+                    : isNew
+                      ? 'bg-amber-50'
+                      : isSelected
+                        ? 'bg-sky-50'
+                        : 'bg-white group-hover:bg-slate-50'
                   return (
                     <tr
                       key={product.id}
                       title={issue?.reason}
                       className={`group border-b border-slate-200 hover:bg-slate-50 ${
-                        issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : ''
+                        issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : isSelected ? 'bg-sky-50' : ''
                       }`}
                     >
+                      <td className={`sticky left-0 z-10 w-9 px-2 py-1 text-center align-top ${stickyBg}`}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelected(product.id)}
+                          className="h-3.5 w-3.5 cursor-pointer align-middle"
+                        />
+                      </td>
                       {/* Position absolue dans le tableau maître : le même numéro que la page Comparer. */}
-                      <td
-                        className={`sticky left-0 z-10 w-10 px-2 py-1 text-right align-top text-[11px] font-semibold tabular-nums text-slate-500 ${
-                          issue ? 'bg-red-50' : isNew ? 'bg-amber-50' : 'bg-white group-hover:bg-slate-50'
-                        }`}
-                      >
+                      <td className={`sticky left-9 z-10 w-10 px-2 py-1 text-right align-top text-[11px] font-semibold tabular-nums text-slate-500 ${stickyBg}`}>
                         {index + 1}
                       </td>
                       {columns.map((column) => {
