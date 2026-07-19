@@ -566,7 +566,7 @@ export function CatalogEditor({ activeView }: { activeView: ProductViewId }) {
                               <select
                                 defaultValue=""
                                 onChange={(e) => { if (e.target.value) saveCell(product, column, e.target.value) }}
-                                className="rounded border border-amber-300 bg-amber-50 px-1 py-0.5 text-[11px] outline-none focus:border-slate-600"
+                                className="rounded border border-red-300 bg-red-50 px-1 py-0.5 text-[11px] outline-none focus:border-slate-600"
                               >
                                 <option value="">{assignable.placeholder}</option>
                                 {(assignableOptions[column] ?? []).map((value) => (
