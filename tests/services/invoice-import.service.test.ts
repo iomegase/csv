@@ -82,6 +82,17 @@ describe('analyse', () => {
     expect(doc!.azureOperationLocation).toBe('https://op/1')
   })
 
+  it('marque la facture en erreur si Azure refuse au démarrage (plus de « pending » muet)', async () => {
+    vi.mocked(beginInvoiceAnalysis).mockRejectedValueOnce(new Error('Azure a refusé l’analyse (401).'))
+    const { invoiceId } = await createInvoiceImport({ buffer: PDF(), originalFileName: 'f.pdf', mimeType: 'application/pdf' })
+
+    await expect(startAnalysis(invoiceId)).rejects.toThrow('401')
+
+    const doc = await InvoiceImport.findById(invoiceId)
+    expect(doc!.status).toBe('error')
+    expect(doc!.errorMessage).toContain('401')
+  })
+
   it('refreshAnalysis succeeded normalise et fige les items', async () => {
     vi.mocked(beginInvoiceAnalysis).mockResolvedValue({ operationLocation: 'https://op/1' })
     vi.mocked(pollInvoiceAnalysis).mockResolvedValue({

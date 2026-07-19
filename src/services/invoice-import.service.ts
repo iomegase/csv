@@ -53,13 +53,25 @@ export async function createInvoiceImport(input: {
 export async function startAnalysis(id: string): Promise<InvoiceImportDoc> {
   const doc = await requireInvoice(id)
   if (doc.validatedAt) throw new Error('Facture validée : édition verrouillée.')
-  const { operationLocation } = await beginInvoiceAnalysis(Buffer.from(doc.pdfContent))
 
-  doc.status = 'processing'
-  doc.azureOperationLocation = operationLocation
-  doc.errorMessage = null
-  await doc.save()
-  return doc.toObject()
+  try {
+    const { operationLocation } = await beginInvoiceAnalysis(Buffer.from(doc.pdfContent))
+    doc.status = 'processing'
+    doc.azureOperationLocation = operationLocation
+    doc.errorMessage = null
+    await doc.save()
+    return doc.toObject()
+  } catch (error) {
+    // Sinon une erreur Azure au démarrage (clé/endpoint manquants, refus 401…)
+    // laisserait la facture « pending » sans trace. On la marque en échec avec
+    // le message, que l'UI affiche déjà, et on trace dans les logs serveur.
+    const message = error instanceof Error ? error.message : 'Analyse impossible.'
+    console.error('startAnalysis a échoué:', message)
+    doc.status = 'error'
+    doc.errorMessage = message
+    await doc.save()
+    throw error
+  }
 }
 
 /** Sonde Azure une fois et fait avancer le statut. */
