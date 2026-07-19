@@ -95,7 +95,10 @@ export function BulkEditModal({
               placeholder="Choisir ou saisir une famille"
               className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-normal"
             />
-            <datalist id="bulk-families">{families.map((f) => <option key={f} value={f} />)}</datalist>
+            <datalist id="bulk-families">
+              <option value="Pas de famille" />
+              {families.map((f) => <option key={f} value={f} />)}
+            </datalist>
           </label>
         )}
 
@@ -109,7 +112,10 @@ export function BulkEditModal({
               placeholder="Choisir ou saisir un fournisseur"
               className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-normal"
             />
-            <datalist id="bulk-suppliers">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
+            <datalist id="bulk-suppliers">
+              <option value="Pas de fournisseur" />
+              {suppliers.map((s) => <option key={s} value={s} />)}
+            </datalist>
           </label>
         )}
 
