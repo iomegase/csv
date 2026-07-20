@@ -1,6 +1,12 @@
 import { Types } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
-import { COL, MASTER_COLUMNS, STOCK_VISUALISATION_QUANTITY, type MasterRow } from '@/lib/shopcaisse-columns'
+import {
+  COL,
+  MASTER_COLUMNS,
+  STOCK_VISUALISATION_QUANTITY,
+  toStockVisualisationRow,
+  type MasterRow,
+} from '@/lib/shopcaisse-columns'
 import {
   buildIdentityIndex,
   identityKeys,
@@ -192,6 +198,7 @@ export async function importStockIntoMaster(parsed: ParsedCsv): Promise<ImportSu
 
   parsed.rows.forEach((source, rowIndex) => {
     const incoming = toMasterRow(source)
+    const stockRow = toStockVisualisationRow(source)
     const match = matchRow(index, incoming)
 
     if (match.status === 'ambiguous') {
@@ -224,7 +231,13 @@ export async function importStockIntoMaster(parsed: ParsedCsv): Promise<ImportSu
     operations.push({
       updateOne: {
         filter: { _id: match.item._id },
-        update: { $set: { templateId: new Types.ObjectId(templateId), ...writeFields(row) } },
+        update: {
+          $set: {
+            templateId: new Types.ObjectId(templateId),
+            ...writeFields(row),
+            shopcaisseStockData: stockRow,
+          },
+        },
       },
     })
     summary.updated += 1

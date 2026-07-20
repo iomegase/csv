@@ -1,7 +1,15 @@
 import { Types } from 'mongoose'
 import { connectToDatabase } from '@/lib/mongodb'
 import { normalizeHeader } from '@/lib/product-views'
-import { COL, MASTER_COLUMNS, isMasterColumn, makeEmptyMasterRow, type MasterRow } from '@/lib/shopcaisse-columns'
+import {
+  COL,
+  MASTER_COLUMNS,
+  isMasterColumn,
+  makeEmptyMasterRow,
+  toStockVisualisationRow,
+  type MasterRow,
+  type StockVisualisationRow,
+} from '@/lib/shopcaisse-columns'
 import { computeMovement } from '@/lib/shopcaisse-stock'
 import { CatalogProduct } from '@/models/CatalogProduct'
 import { CsvTemplate } from '@/models/CsvTemplate'
@@ -12,6 +20,7 @@ export const MASTER_TEMPLATE_NAME = 'Tableau maître ShopCaisse'
 export interface MasterEntry {
   id: string
   row: MasterRow
+  stockRow?: StockVisualisationRow | null
 }
 
 const TRUTHY_SUPPRIME = new Set(['1', 'oui', 'true', 'vrai'])
@@ -155,10 +164,13 @@ async function migrateCatalogToMaster(templateId: string): Promise<void> {
 export async function listMasterEntries(): Promise<MasterEntry[]> {
   await connectToDatabase()
 
-  const products = await CatalogProduct.find({}).sort({ _id: 1 }).select('csvData').lean()
+  const products = await CatalogProduct.find({}).sort({ _id: 1 }).select('csvData shopcaisseStockData').lean()
 
   return products.map((product) => ({
     id: String(product._id),
     row: toMasterRow((product.csvData ?? {}) as Record<string, unknown>),
+    stockRow: product.shopcaisseStockData
+      ? toStockVisualisationRow(product.shopcaisseStockData as Record<string, unknown>)
+      : null,
   }))
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { withTestDatabase } from '../helpers/db'
 import { CatalogProduct } from '@/models/CatalogProduct'
-import { COL } from '@/lib/shopcaisse-columns'
+import { COL, STOCK_COLUMNS } from '@/lib/shopcaisse-columns'
 import { importProductsIntoMaster, importStockIntoMaster } from '@/services/shopcaisse-import.service'
 import type { ParsedCsv } from '@/services/csv-parser.service'
 
@@ -44,7 +44,7 @@ async function firstRow() {
 
 /** Le vrai export ShopCaisse « Visualisation des stocks » : quantité en « En stock ». */
 function parsedVisualisation(rows: Array<Record<string, string>>): ParsedCsv {
-  const columns = ['Identifiant', 'Nom', 'Référence', 'En stock', 'Stock effectif']
+  const columns = [...STOCK_COLUMNS]
   return {
     columns,
     rows: rows.map((row) => Object.fromEntries(columns.map((c) => [c, row[c] ?? '']))),
@@ -61,6 +61,42 @@ describe('importStockIntoMaster — fichier « Visualisation des stocks »', () 
 
     expect(summary.updated).toBe(1)
     expect((await firstRow())[COL.stockActuel]).toBe('5')
+  })
+
+  it('conserve les 13 cellules de la ligne source pour le futur export', async () => {
+    await importProductsIntoMaster(parsedProducts([{ Identifiant: '42', Nom: 'Café', Référence: 'REF-42' }]))
+    await importStockIntoMaster(parsedVisualisation([{
+      Identifiant: '42',
+      Nom: 'Café',
+      Référence: 'REF-42',
+      'En stock': '5',
+      'Mon Magasin': '5',
+      'Réservés client': '1',
+      'Réservés fournisseur': '2',
+      'Stock effectif': '2',
+      "Prix d'achat H.T.": '3,50',
+      'Valeur H.T.': '17,50',
+      'Prix par défaut': '8,90',
+      Fournisseur: 'Maison A',
+      Famille: 'Décoration',
+    }]))
+
+    const product = await CatalogProduct.findOne({ shopcaisseId: '42' }).lean()
+    expect(product?.shopcaisseStockData).toEqual({
+      Identifiant: '42',
+      Nom: 'Café',
+      Référence: 'REF-42',
+      'En stock': '5',
+      'Mon Magasin': '5',
+      'Réservés client': '1',
+      'Réservés fournisseur': '2',
+      'Stock effectif': '2',
+      "Prix d'achat H.T.": '3,50',
+      'Valeur H.T.': '17,50',
+      'Prix par défaut': '8,90',
+      Fournisseur: 'Maison A',
+      Famille: 'Décoration',
+    })
   })
 })
 

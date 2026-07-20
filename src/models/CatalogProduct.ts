@@ -14,6 +14,7 @@ const CatalogProductSchema = new Schema(
 
     csvData: { type: Schema.Types.Mixed, required: true },
     originalCsvData: { type: Schema.Types.Mixed, default: null },
+    shopcaisseStockData: { type: Schema.Types.Mixed, default: null },
 
     // Renseignés par le lot 3. Le modèle InvoiceImport n'existe pas encore :
     // la ref reste inerte tant qu'aucun populate ne la traverse.
