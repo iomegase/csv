@@ -18,13 +18,13 @@ function entry(
 
 /** Les lignes de données du CSV, en-tête et BOM retirés. */
 function dataLines(csv: string): string[] {
-  return csv.replace(/^﻿/, '').split('\r\n').slice(1).filter(Boolean)
+  return csv.replace(/^﻿/, '').split(/\r?\n/).slice(1).filter(Boolean)
 }
 
 describe('buildProductRows', () => {
   it('produit les 19 colonnes ShopCaisse dans l’ordre', () => {
     const csv = serializeCsv(PRODUCT_COLUMNS, buildProductRows([entry('a', { [COL.nom]: 'Café' })]))
-    expect(csv.replace(/^﻿/, '').split('\r\n')[0]).toBe(PRODUCT_COLUMNS.join(';'))
+    expect(csv.replace(/^﻿/, '').split('\n')[0]).toBe(PRODUCT_COLUMNS.join(';'))
   })
 
   it('n’expose jamais les colonnes internes de stock', () => {
@@ -89,7 +89,7 @@ describe('buildProductRows', () => {
 describe('buildStockRows', () => {
   it('produit les 13 colonnes Visualisation des stocks dans l’ordre', () => {
     const csv = serializeCsv(STOCK_COLUMNS, buildStockRows([entry('a', { [COL.nom]: 'Café' })]))
-    expect(csv.replace(/^﻿/, '').split('\r\n')[0]).toBe(STOCK_COLUMNS.join(';'))
+    expect(csv.replace(/^﻿/, '').split('\n')[0]).toBe(STOCK_COLUMNS.join(';'))
   })
 
   it('conserve la ligne source et exporte Stock souhaité dans En stock', () => {
@@ -212,9 +212,10 @@ describe('serializeCsv', () => {
     )
   })
 
-  it('sépare par point-virgule et termine les lignes en CRLF', () => {
+  it('sépare par point-virgule et reproduit les fins de ligne LF des références', () => {
     const csv = serializeCsv(STOCK_COLUMNS, buildStockRows([entry('a', { [COL.nom]: 'Café' })]))
-    expect(csv.replace(/^﻿/, '')).toBe(`${STOCK_COLUMNS.join(';')}\r\n;Café;;;;;;;;;;;\r\n`)
+    expect(csv).not.toContain('\r\n')
+    expect(csv.replace(/^﻿/, '')).toBe(`${STOCK_COLUMNS.join(';')}\n;Café;;;;;;;;;;;\n`)
   })
 
   it('échappe une valeur contenant le séparateur', () => {

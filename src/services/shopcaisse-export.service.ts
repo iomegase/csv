@@ -103,7 +103,7 @@ export function checkAlignment(productRows: MasterRow[], stockRows: MasterRow[])
   return issues
 }
 
-/** CSV ShopCaisse : BOM UTF-8, séparateur `;`, fins de ligne CRLF. */
+/** CSV ShopCaisse : BOM UTF-8, séparateur `;`, fins de ligne LF comme les références. */
 export function serializeCsv(columns: readonly string[], rows: MasterRow[]): string {
   const lines = [columns.map((column) => serializeCsvValue(column, ';')).join(';')]
 
@@ -111,5 +111,5 @@ export function serializeCsv(columns: readonly string[], rows: MasterRow[]): str
     lines.push(columns.map((column) => serializeCsvValue(row[column], ';')).join(';'))
   }
 
-  return `﻿${lines.join('\r\n')}\r\n`
+  return `﻿${lines.join('\n')}\n`
 }

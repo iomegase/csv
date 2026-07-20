@@ -1,4 +1,6 @@
 import JSZip from 'jszip'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { withTestDatabase } from '../helpers/db'
 import { CatalogProduct } from '@/models/CatalogProduct'
@@ -8,6 +10,12 @@ import { PRODUCTS_FILE_NAME, STOCK_FILE_NAME } from '@/services/shopcaisse-expor
 import { buildExportBundle, ExportBlockedError } from '@/services/shopcaisse-bundle.service'
 
 withTestDatabase()
+
+const FIXTURES = join(process.cwd(), 'tests/fixtures/shopcaisse')
+
+function referenceHeader(fileName: string): string {
+  return readFileSync(join(FIXTURES, fileName), 'utf-8').replace(/^﻿/, '').split('\n')[0]
+}
 
 async function seed(rows: Array<Partial<Record<string, string>>>) {
   const templateId = await ensureMasterTemplate()
@@ -35,7 +43,7 @@ describe('buildExportBundle', () => {
     expect(fileName).toMatch(/^lot-shopcaisse-\d{4}-\d{2}-\d{2}\.zip$/)
   })
 
-  it('écrit les deux fichiers en UTF-8 avec BOM et séparateur point-virgule', async () => {
+  it('écrit les deux fichiers avec les en-têtes, le BOM et les LF des références', async () => {
     await seed([{ [COL.identifiant]: '1', [COL.reference]: 'REF-1', [COL.nom]: 'Café à emporter' }])
     const files = await readZip((await buildExportBundle()).zip)
 
@@ -43,7 +51,15 @@ describe('buildExportBundle', () => {
       expect(files[name].startsWith('﻿')).toBe(true)
       expect(files[name]).toContain(';')
       expect(files[name]).toContain('Café à emporter')
+      expect(files[name]).not.toContain('\r\n')
     }
+
+    expect(files[PRODUCTS_FILE_NAME].replace(/^﻿/, '').split('\n')[0]).toBe(
+      referenceHeader('produits-reference-20260719.csv'),
+    )
+    expect(files[STOCK_FILE_NAME].replace(/^﻿/, '').split('\n')[0]).toBe(
+      referenceHeader('stocks-reference-20260719.csv'),
+    )
   })
 
   it('donne aux deux fichiers le même nombre de lignes et le même ordre', async () => {
@@ -54,7 +70,7 @@ describe('buildExportBundle', () => {
     ])
     const files = await readZip((await buildExportBundle()).zip)
 
-    const lines = (csv: string) => csv.replace(/^﻿/, '').split('\r\n').slice(1).filter(Boolean)
+    const lines = (csv: string) => csv.replace(/^﻿/, '').split(/\r?\n/).slice(1).filter(Boolean)
     const products = lines(files[PRODUCTS_FILE_NAME])
     const stock = lines(files[STOCK_FILE_NAME])
 
@@ -115,6 +131,6 @@ describe('buildExportBundle', () => {
   it('exporte un catalogue vide sans jeter', async () => {
     await ensureMasterTemplate()
     const files = await readZip((await buildExportBundle()).zip)
-    expect(files[PRODUCTS_FILE_NAME].replace(/^﻿/, '').split('\r\n').filter(Boolean)).toHaveLength(1)
+    expect(files[PRODUCTS_FILE_NAME].replace(/^﻿/, '').split(/\r?\n/).filter(Boolean)).toHaveLength(1)
   })
 })
