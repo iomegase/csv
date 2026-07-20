@@ -31,6 +31,14 @@ export const COL = {
   prixTtc: 'PRIX TTC - Défaut - Mon Magasin Caisse 1',
   supprime: 'Supprimé',
   quantite: 'Quantité',
+  enStock: 'En stock',
+  monMagasin: 'Mon Magasin',
+  reservesClient: 'Réservés client',
+  reservesFournisseur: 'Réservés fournisseur',
+  stockEffectif: 'Stock effectif',
+  prixAchatHt: "Prix d'achat H.T.",
+  valeurHt: 'Valeur H.T.',
+  prixParDefaut: 'Prix par défaut',
 } as const
 
 /** Le tableau maître : toutes les données produit + les colonnes de stock internes. */
@@ -84,21 +92,30 @@ export const PRODUCT_COLUMNS: readonly string[] = [
   COL.reference,
   COL.description,
   COL.unite,
-  COL.prixAchat,
   COL.gestionStock,
   COL.affichageStock,
+  COL.prixTtc,
   COL.couleurFond,
   COL.texteBouton,
-  COL.prixTtc,
   COL.supprime,
+  COL.prixAchat,
 ]
 
-/** `export-stock.csv`. `Quantité` porte le mouvement, jamais le stock souhaité. */
+/** `export-stock.csv`, identique à « Visualisation des stocks » de ShopCaisse. */
 export const STOCK_COLUMNS: readonly string[] = [
   COL.identifiant,
-  COL.reference,
   COL.nom,
-  COL.quantite,
+  COL.reference,
+  COL.enStock,
+  COL.monMagasin,
+  COL.reservesClient,
+  COL.reservesFournisseur,
+  COL.stockEffectif,
+  COL.prixAchatHt,
+  COL.valeurHt,
+  COL.prixParDefaut,
+  COL.fournisseur,
+  COL.famille,
 ]
 
 /**
@@ -108,9 +125,18 @@ export const STOCK_COLUMNS: readonly string[] = [
  * est le format que ShopCaisse ATTEND à l'import (donc notre export à nous).
  * On lit le stock physique, pas `Stock effectif` (qui déduit les réservés).
  */
-export const STOCK_VISUALISATION_QUANTITY = 'En stock'
+export const STOCK_VISUALISATION_QUANTITY = COL.enStock
 
 export type MasterRow = Record<string, string | null>
+export type StockVisualisationRow = Record<string, string | null>
+
+/** Ne conserve que les 13 cellules du format Visualisation des stocks. */
+export function toStockVisualisationRow(source: Record<string, unknown>): StockVisualisationRow {
+  return Object.fromEntries(STOCK_COLUMNS.map((column) => {
+    const value = source[column]
+    return [column, value === undefined || value === null || String(value) === '' ? null : String(value)]
+  }))
+}
 
 /** Une ligne maître neuve : les 22 colonnes présentes, toutes vides (jamais 0). */
 export function makeEmptyMasterRow(): MasterRow {

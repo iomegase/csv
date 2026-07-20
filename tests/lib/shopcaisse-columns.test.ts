@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
-  COL,
   MASTER_COLUMNS,
   PRODUCT_COLUMNS,
   STOCK_COLUMNS,
@@ -23,18 +22,18 @@ describe('shopcaisse-columns', () => {
     expect(MASTER_COLUMNS).toEqual(headerOf('fichier-maitre.csv'))
   })
 
-  it('reprend exactement les intitulés de export-produits.csv', () => {
-    expect(PRODUCT_COLUMNS).toEqual(headerOf('export-produits.csv'))
+  it('reprend exactement les intitulés du fichier Produits fourni', () => {
+    expect(PRODUCT_COLUMNS).toEqual(headerOf('produits-reference-20260719.csv'))
   })
 
-  it('reprend exactement les intitulés du modèle de stock', () => {
-    expect(STOCK_COLUMNS).toEqual(headerOf('export-stock-modele.csv'))
+  it('reprend exactement les intitulés du fichier Visualisation des stocks fourni', () => {
+    expect(STOCK_COLUMNS).toEqual(headerOf('stocks-reference-20260719.csv'))
   })
 
-  it('compte 22 colonnes maître, 19 produit, 4 stock', () => {
+  it('compte 22 colonnes maître, 19 produit, 13 stock', () => {
     expect(MASTER_COLUMNS).toHaveLength(22)
     expect(PRODUCT_COLUMNS).toHaveLength(19)
-    expect(STOCK_COLUMNS).toHaveLength(4)
+    expect(STOCK_COLUMNS).toHaveLength(13)
   })
 
   it('n\'expose aucune colonne interne de stock dans l\'export produits', () => {
@@ -44,9 +43,8 @@ describe('shopcaisse-columns', () => {
     }
   })
 
-  it('n\'ajoute aucune colonne hors du maître dans les exports', () => {
-    for (const column of [...PRODUCT_COLUMNS, ...STOCK_COLUMNS]) {
-      if (column === COL.quantite) continue // propre au fichier stock
+  it('n\'ajoute aucune colonne produit hors du maître', () => {
+    for (const column of PRODUCT_COLUMNS) {
       expect(MASTER_COLUMNS).toContain(column)
     }
   })
