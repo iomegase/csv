@@ -60,9 +60,9 @@ describe('buildExportBundle', () => {
 
     expect(products).toHaveLength(3)
     expect(stock).toHaveLength(3)
-    // Ligne à ligne, le même produit : le Nom est en 2e position côté produits, en 3e côté stock.
+    // Ligne à ligne, le même produit : le Nom est en 2e position dans les deux fichiers.
     expect(products.map((line) => line.split(';')[1])).toEqual(['Café', 'Thé', 'Vase'])
-    expect(stock.map((line) => line.split(';')[2])).toEqual(['Café', 'Thé', 'Vase'])
+    expect(stock.map((line) => line.split(';')[1])).toEqual(['Café', 'Thé', 'Vase'])
   })
 
   it('renvoie le résumé de l’export', async () => {

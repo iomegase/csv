@@ -8,8 +8,12 @@ import {
   serializeCsv,
 } from '@/services/shopcaisse-export.service'
 
-function entry(id: string, values: Record<string, string | null>): MasterEntry {
-  return { id, row: { ...makeEmptyMasterRow(), [COL.supprime]: '0', ...values } }
+function entry(
+  id: string,
+  values: Record<string, string | null>,
+  stockRow: Record<string, string | null> | null = null,
+): MasterEntry {
+  return { id, row: { ...makeEmptyMasterRow(), [COL.supprime]: '0', ...values }, stockRow }
 }
 
 /** Les lignes de données du CSV, en-tête et BOM retirés. */
@@ -56,7 +60,7 @@ describe('buildProductRows', () => {
       }),
     ])
     expect(dataLines(serializeCsv(PRODUCT_COLUMNS, rows))[0]).toBe(
-      ';Café Latte;Boissons;Entrée;Fournisseur A;20.0;10.0;SIMPLE;3760001000001;REF-001;Un café latte onctueux;UNIT;2.50;1;1;#190fa7;Dessert;;0',
+      ';Café Latte;Boissons;Entrée;Fournisseur A;20.0;10.0;SIMPLE;3760001000001;REF-001;Un café latte onctueux;UNIT;1;1;;#190fa7;Dessert;0;2.50',
     )
   })
 
@@ -67,8 +71,8 @@ describe('buildProductRows', () => {
     ]))
     expect(csv).not.toMatch(/;Oui/)
     expect(csv).not.toMatch(/;Non/)
-    expect(dataLines(csv)[0].endsWith(';1')).toBe(true)
-    expect(dataLines(csv)[1].endsWith(';0')).toBe(true)
+    expect(dataLines(csv)[0].split(';')[17]).toBe('1')
+    expect(dataLines(csv)[1].split(';')[17]).toBe('0')
   })
 
   it('conserve la ligne d’un produit marqué supprimé', () => {
@@ -78,46 +82,76 @@ describe('buildProductRows', () => {
 
   it('conserve les cellules vides', () => {
     const line = dataLines(serializeCsv(PRODUCT_COLUMNS, buildProductRows([entry('a', { [COL.nom]: 'Café' })])))[0]
-    expect(line).toBe(';Café;;;;;;;;;;;;;;;;;0')
+    expect(line).toBe(';Café;;;;;;;;;;;;;;;;0;')
   })
 })
 
 describe('buildStockRows', () => {
-  it('produit les 4 colonnes stock dans l’ordre', () => {
+  it('produit les 13 colonnes Visualisation des stocks dans l’ordre', () => {
     const csv = serializeCsv(STOCK_COLUMNS, buildStockRows([entry('a', { [COL.nom]: 'Café' })]))
-    expect(csv.replace(/^﻿/, '').split('\r\n')[0]).toBe('Identifiant;Référence;Nom;Quantité')
+    expect(csv.replace(/^﻿/, '').split('\r\n')[0]).toBe(STOCK_COLUMNS.join(';'))
   })
 
-  it('alimente Quantité depuis Mouvement stock, jamais depuis Stock souhaité', () => {
+  it('conserve la ligne source et exporte Stock souhaité dans En stock', () => {
     const rows = buildStockRows([
-      entry('a', { [COL.reference]: 'REF-001', [COL.nom]: 'Café', [COL.stockActuel]: '5', [COL.stockSouhaite]: '8', [COL.mouvementStock]: '3' }),
+      entry(
+        'a',
+        {
+          [COL.identifiant]: '42',
+          [COL.reference]: 'REF-001',
+          [COL.nom]: 'Café',
+          [COL.stockActuel]: '5',
+          [COL.stockSouhaite]: '8',
+          [COL.prixAchat]: '3,60',
+          [COL.prixTtc]: '9,20',
+          [COL.fournisseur]: 'Maison B',
+          [COL.famille]: 'Boissons',
+        },
+        {
+          Identifiant: '42',
+          Nom: 'Ancien café',
+          Référence: 'OLD',
+          'En stock': '5',
+          'Mon Magasin': '5',
+          'Réservés client': '1',
+          'Réservés fournisseur': '2',
+          'Stock effectif': '2',
+          "Prix d'achat H.T.": '3,50',
+          'Valeur H.T.': '17,50',
+          'Prix par défaut': '8,90',
+          Fournisseur: 'Maison A',
+          Famille: 'Café',
+        },
+      ),
     ])
-    expect(rows[0][COL.quantite]).toBe('3')
-    expect(dataLines(serializeCsv(STOCK_COLUMNS, rows))[0]).toBe(';REF-001;Café;3')
+    expect(Object.keys(rows[0])).toEqual([...STOCK_COLUMNS])
+    expect(rows[0]).toMatchObject({
+      Identifiant: '42',
+      Nom: 'Café',
+      Référence: 'REF-001',
+      'En stock': '8',
+      'Mon Magasin': '5',
+      'Réservés client': '1',
+      'Réservés fournisseur': '2',
+      'Stock effectif': '2',
+      "Prix d'achat H.T.": '3,60',
+      'Valeur H.T.': '17,50',
+      'Prix par défaut': '9,20',
+      Fournisseur: 'Maison B',
+      Famille: 'Boissons',
+    })
   })
 
-  it('exporte un mouvement nul comme 0', () => {
-    const rows = buildStockRows([entry('a', { [COL.nom]: 'Café', [COL.mouvementStock]: '0' })])
-    expect(rows[0][COL.quantite]).toBe('0')
+  it('utilise Stock actuel quand Stock souhaité est vide', () => {
+    const rows = buildStockRows([entry('a', { [COL.nom]: 'Café', [COL.stockActuel]: '5' })])
+    expect(rows[0][COL.enStock]).toBe('5')
   })
 
-  it('exporte un mouvement négatif tel quel', () => {
-    const rows = buildStockRows([entry('a', { [COL.nom]: 'Café', [COL.mouvementStock]: '-3' })])
-    expect(rows[0][COL.quantite]).toBe('-3')
-  })
-
-  it('laisse la Quantité vide quand le mouvement est vide — jamais de zéro', () => {
+  it('laisse les cellules inconnues vides', () => {
     const rows = buildStockRows([entry('a', { [COL.nom]: 'Café' })])
-    expect(rows[0][COL.quantite]).toBeNull()
-    expect(dataLines(serializeCsv(STOCK_COLUMNS, rows))[0]).toBe(';;Café;')
-  })
-
-  it('garde la ligne d’un mouvement vide ou nul', () => {
-    const rows = buildStockRows([
-      entry('a', { [COL.nom]: 'A' }),
-      entry('b', { [COL.nom]: 'B', [COL.mouvementStock]: '0' }),
-    ])
-    expect(rows).toHaveLength(2)
+    expect(rows[0][COL.monMagasin]).toBeNull()
+    expect(rows[0][COL.reservesClient]).toBeNull()
+    expect(rows[0][COL.stockEffectif]).toBeNull()
   })
 
   it('garde la ligne d’un produit sans Identifiant, Identifiant vide', () => {
@@ -180,7 +214,7 @@ describe('serializeCsv', () => {
 
   it('sépare par point-virgule et termine les lignes en CRLF', () => {
     const csv = serializeCsv(STOCK_COLUMNS, buildStockRows([entry('a', { [COL.nom]: 'Café' })]))
-    expect(csv.replace(/^﻿/, '')).toBe('Identifiant;Référence;Nom;Quantité\r\n;;Café;\r\n')
+    expect(csv.replace(/^﻿/, '')).toBe(`${STOCK_COLUMNS.join(';')}\r\n;Café;;;;;;;;;;;\r\n`)
   })
 
   it('échappe une valeur contenant le séparateur', () => {

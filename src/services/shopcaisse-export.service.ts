@@ -1,4 +1,11 @@
-import { COL, PRODUCT_COLUMNS, type MasterRow } from '@/lib/shopcaisse-columns'
+import {
+  COL,
+  PRODUCT_COLUMNS,
+  toStockVisualisationRow,
+  type MasterRow,
+  type StockVisualisationRow,
+} from '@/lib/shopcaisse-columns'
+import { readStockCell } from '@/lib/shopcaisse-stock'
 import { serializeCsvValue } from '@/services/catalog-export.service'
 import { normalizeSupprime } from '@/services/shopcaisse-master.service'
 import type { MasterEntry } from '@/services/shopcaisse-master.service'
@@ -38,18 +45,27 @@ export function buildProductRows(entries: MasterEntry[]): MasterRow[] {
 /**
  * Les lignes de `export-stock.csv`, dans le même ordre et en même nombre.
  *
- * `Quantité` porte le **mouvement**, pas le stock souhaité : ShopCaisse ajoute
- * la valeur reçue au stock existant. Y mettre la cible doublerait les quantités.
+ * La ligne source importée est conservée. Les données communes suivent la
+ * version courante du produit, et `En stock` porte la cible quand elle existe.
  */
-export function buildStockRows(entries: MasterEntry[]): MasterRow[] {
-  return entries.map((entry) => ({
-    [COL.identifiant]: entry.row[COL.identifiant] ?? null,
-    [COL.reference]: entry.row[COL.reference] ?? null,
-    [COL.nom]: entry.row[COL.nom] ?? null,
-    // Un mouvement vide reste vide : « 0 » affirmerait « ne rien changer »,
-    // alors qu'on ne sait pas ce qu'il faut faire.
-    [COL.quantite]: entry.row[COL.mouvementStock] ?? null,
-  }))
+export function buildStockRows(entries: MasterEntry[]): StockVisualisationRow[] {
+  return entries.map((entry) => {
+    const row = toStockVisualisationRow(entry.stockRow ?? {})
+    const target = readStockCell(entry.row[COL.stockSouhaite])
+
+    row[COL.identifiant] = entry.row[COL.identifiant] ?? null
+    row[COL.nom] = entry.row[COL.nom] ?? null
+    row[COL.reference] = entry.row[COL.reference] ?? null
+    row[COL.enStock] = target.kind === 'number'
+      ? entry.row[COL.stockSouhaite]
+      : entry.row[COL.stockActuel] ?? row[COL.enStock]
+    row[COL.prixAchatHt] = entry.row[COL.prixAchat] ?? row[COL.prixAchatHt]
+    row[COL.prixParDefaut] = entry.row[COL.prixTtc] ?? row[COL.prixParDefaut]
+    row[COL.fournisseur] = entry.row[COL.fournisseur] ?? row[COL.fournisseur]
+    row[COL.famille] = entry.row[COL.famille] ?? row[COL.famille]
+
+    return row
+  })
 }
 
 /**
